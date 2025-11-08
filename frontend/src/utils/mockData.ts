@@ -187,7 +187,7 @@ export const mockMonthlyForecastData = [
 
 export const mockBatchReports: BatchReport[] = [
   {
-    batch_id: 'B001',
+    id: '1',
     date_started: '2024-01-15',
     date_completed: '2024-02-20',
     avg_temperature: 25.2,
@@ -198,7 +198,7 @@ export const mockBatchReports: BatchReport[] = [
     harvest: 950
   },
   {
-    batch_id: 'B002',
+    id: '2',
     date_started: '2024-02-01',
     avg_temperature: 24.8,
     avg_humidity: 65.2,

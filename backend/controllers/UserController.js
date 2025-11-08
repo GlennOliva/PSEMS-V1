@@ -11,7 +11,6 @@ exports.getUser = (req, res) => {
 // 📌 Get user by ID
 exports.getUserById = (req, res) => {
   const userId = req.params.id;
-
   User.getUserbyId(userId, (err, result) => {
     if (err) {
       console.error('Database error:', err);
@@ -29,13 +28,13 @@ exports.getUserById = (req, res) => {
 // 📌 Register user
 exports.addUser = (req, res) => {
   try {
-    const { full_name, email, password, address } = req.body;
+    const { full_name, email, password, address, role } = req.body;
 
     if (!full_name || !email || !password || !address) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    const userData = { full_name, email, password, address };
+    const userData = { full_name, email, password, address, role: role || 'staff' };
 
     User.addUser(userData, (err, result) => {
       if (err) {
@@ -43,7 +42,7 @@ exports.addUser = (req, res) => {
         return res.status(500).json({ error: err });
       }
       res.status(201).json({
-        message: 'User Successfully Registered',
+        message: 'Staff Successfully Created',
         id: result.insertId
       });
     });
@@ -56,9 +55,9 @@ exports.addUser = (req, res) => {
 // 📌 Update user
 exports.updateUser = (req, res) => {
   const id = req.params.id;
-  const { full_name, email, password, address } = req.body;
+  const { full_name, email, password, address, role } = req.body;
 
-  const updatedData = { full_name, email, password, address };
+  const updatedData = { full_name, email, password, address, role };
 
   User.updateUser(id, updatedData, (err, result) => {
     if (err) {
@@ -70,10 +69,11 @@ exports.updateUser = (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({ message: 'User updated successfully!' });
+    res.json({ message: 'Staff updated successfully!' });
   });
 };
 
+// 🔐 Login user (only admin or staff)
 exports.loginUser = (req, res) => {
   const { email, password } = req.body;
 
@@ -84,13 +84,16 @@ exports.loginUser = (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // ✅ remove sensitive fields before logging or sending
-    const { password: pw, email: em, full_name: fn, address: add ,...safeUser } = results[0];
-
-    console.log('User logged in:', safeUser); // password/email/full_name removed
+    const { password: pw, ...safeUser } = results[0];
 
     res.json({ message: 'Login successful', user: safeUser });
   });
 };
 
-
+// 👥 Get all staff users
+exports.getStaffUsers = (req, res) => {
+  User.getStaffUsers((err, results) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json(results);
+  });
+};

@@ -14,14 +14,15 @@ exports.getUserbyId = (userId, callback) => {
 
 exports.addUser = (data, callback) => {
   const sql = `
-    INSERT INTO tbl_user (full_name , email , password, address)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO tbl_user (full_name, email, password, address, role)
+    VALUES (?, ?, ?, ?, ?)
   `;
   const values = [
     data.full_name,
     data.email,
     data.password,
-    data.address
+    data.address,
+    data.role || 'staff', // default role = staff
   ];
   db.query(sql, values, callback);
 };
@@ -30,7 +31,7 @@ exports.addUser = (data, callback) => {
 exports.updateUser = (id, data, callback) => {
   const sql = `
     UPDATE tbl_user
-    SET full_name = ? , email = ? , password = ? , address = ?
+    SET full_name = ?, email = ?, password = ?, address = ?, role = ?
     WHERE id = ?
   `;
   const values = [
@@ -38,15 +39,29 @@ exports.updateUser = (id, data, callback) => {
     data.email,
     data.password,
     data.address,
-    id
+    data.role,
+    id,
   ];
   db.query(sql, values, callback);
 };
 
 
 // 🔐 Login function
+// 🔐 Login function (only admin or staff can log in)
 exports.loginUser = (email, password, callback) => {
-    const sql = `SELECT * FROM tbl_user WHERE email = ? AND password = ?`;
-    db.query(sql, [email, password], callback);
-  };
+  const sql = `
+    SELECT * FROM tbl_user 
+    WHERE email = ? 
+      AND password = ? 
+      AND (role = 'admin' OR role = 'staff')
+  `;
+  db.query(sql, [email, password], callback);
+};
+
   
+
+// 👥 Get all staff users
+exports.getStaffUsers = (callback) => {
+  const sql = `SELECT * FROM tbl_user WHERE role = 'staff'`;
+  db.query(sql, callback);
+};

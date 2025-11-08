@@ -11,6 +11,11 @@ const batchRoutes = require('./routes/BatchRoutes');
 const mortalityRoutes = require('./routes/MortalityRoutes');
 const dailylogsRoutes = require('./routes/DailyLogsRoutes');
 const growthTrackingRoutes = require('./routes/GrowthTrackingRoutes');
+const harvestDataRoutes = require('./routes/HarvestDataRoutes');
+const mortalityDataRoutes = require('./routes/MortalityDataRoutes')
+const monthlyForecastRoutes = require('./routes/ForecastRoutes');
+
+
 
 
 app.use(express.json()); // <– parse JSON bodies
@@ -22,7 +27,9 @@ app.use('/api/batch', batchRoutes);
 app.use('/api/mortality', mortalityRoutes);
 app.use('/api/daily_logs', dailylogsRoutes);
 app.use('/api/growth_tracking', growthTrackingRoutes);
-
+app.use('/api/harvest_data', harvestDataRoutes);
+app.use('/api/mortality_data', mortalityDataRoutes);
+app.use('/api/monthly_forecast', monthlyForecastRoutes);
 const PORT = process.env.PORT || 8081;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 

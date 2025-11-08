@@ -35,14 +35,21 @@ const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     if (response.status === 200) {
       const { user, token } = response.data;
 
+      // ✅ Check if role is admin or staff
+      if (user.role !== "admin" && user.role !== "staff") {
+        setSnackbar({
+          open: true,
+          message: "You do not have permission to login.",
+          severity: "error",
+        });
+        return; // stop login
+      }
+
       console.log("Login Successful:", user);
 
-      // ✅ Save both token and user_id in localStorage
+      // ✅ Save token and user_id
       localStorage.setItem("token", token);
       localStorage.setItem("user_id", user.id);
-
-      //console.log("User ID:", user.id);
-      //console.log("Token:", token);
 
       setSnackbar({ open: true, message: "Login Successful!", severity: "success" });
 
@@ -60,6 +67,7 @@ const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     }
   }
 };
+
 
 
   return (
@@ -157,7 +165,7 @@ const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
             </button>
           </form>
 
-          {/* Register Link */}
+          {/* Register Link
         <div className="mt-6 text-center">
   <p className="text-gray-600">
     Don't have an account?{" "}
@@ -168,7 +176,7 @@ const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
       Sign up
     </Link>
   </p>
-</div>
+</div> */}
         </div>
       </div>
 

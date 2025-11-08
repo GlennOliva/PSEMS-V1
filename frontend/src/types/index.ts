@@ -14,6 +14,15 @@ export interface Barn {
 }
 
 
+export interface Staff {
+  id: number;
+  full_name: string;
+  email: string;
+  address: string;
+  password: string;
+  role: string;
+}
+
 
 
 export interface Batch {
@@ -78,7 +87,7 @@ export interface ForecastData {
 }
 
 export interface BatchReport {
-  batch_id: string;
+  id: string;
   date_started: string;
   date_completed?: string;
   avg_temperature: number;

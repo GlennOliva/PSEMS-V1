@@ -8,6 +8,7 @@ import {
   FileText,
   Database,
   LogOut,
+  User2,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import logo from '../images/image-removebg-preview.png'
@@ -17,16 +18,29 @@ import logo from '../images/image-removebg-preview.png'
 const Sidebar: React.FC = () => {
     const navigate = useNavigate();
     const apiUrl = import.meta.env.VITE_API_URL;
-      const [userProfile, setUserProfile] = useState<{   email: string} | null>(null);
-  const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: Home },
-    { to: '/temperature', label: 'Temperature', icon: Thermometer },
-    { to: '/humidity', label: 'Humidity', icon: Droplets },
-    { to: '/ammonia', label: 'Ammonia', icon: Wind },
-    { to: '/co2', label: 'CO₂', icon: Activity },
-    { to: '/barn-records', label: 'Barn Records', icon: Database },
-    { to: '/reports', label: 'Reports', icon: FileText },
+      const [userProfile, setUserProfile] = useState<{   email: string;  role: "admin" | "staff";} | null>(null);
+ 
+      const navItems = [
+    { to: "/dashboard", label: "Dashboard", icon: Home },
+    { to: "/temperature", label: "Temperature", icon: Thermometer },
+    { to: "/humidity", label: "Humidity", icon: Droplets },
+    { to: "/ammonia", label: "Ammonia", icon: Wind },
+    { to: "/co2", label: "CO₂", icon: Activity },
+    { to: "/barn-records", label: "Barn Records", icon: Database },
+    { to: "/reports", label: "Reports", icon: FileText }, // Only for admin
+     { to: "/manage_staff", label: "Staff", icon: User2 }, // Only for admin
   ];
+
+  // ✅ Filter items based on role
+  const filteredNavItems = navItems.filter(item => {
+    if (item.label === "Reports" && userProfile?.role !== "admin") {
+      return false; // hide Reports if not admin
+    }
+    else if (item.label === "Staff" && userProfile?.role !== "admin") {
+      return false; // hide Staff if not admin
+    }
+    return true;
+  });
 
 
   useEffect(() => {
@@ -77,7 +91,7 @@ const Sidebar: React.FC = () => {
       {/* Navigation */}
       <nav className="mt-6 px-3">
         <div className="space-y-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
+      {filteredNavItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -106,7 +120,7 @@ const Sidebar: React.FC = () => {
     <p className="text-sm font-medium text-gray-800">
           Hi, {userProfile?.email}
     </p>
-    <p className="text-xs text-gray-500">Administrator</p> {/* optional role/label */}
+    <p className="text-xs text-gray-500">{userProfile?.role}</p> {/* optional role/label */}
 
     {/* Logout Button */}
     <button

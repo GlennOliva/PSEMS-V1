@@ -81,14 +81,14 @@ const BarnModal: React.FC<BarnModalProps> = ({
       let res: Response;
 
       if (mode === 'add') {
-        // ➕ ADD barn
+     
         res = await fetch(`${apiUrl}/api/barn/add_barn`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else {
-        // ✏️ UPDATE barn
+      
         res = await fetch(`${apiUrl}/api/barn/${formData.barn_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

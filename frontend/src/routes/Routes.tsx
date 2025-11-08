@@ -8,6 +8,7 @@ import Sidebar from "../components/Sidebar";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import ProtectedRoute from "./ProtectedRoute";
+import ManageStaff from "../pages/ManageStaff";
 
 // Layout wrapper
 const MainLayout = () => (
@@ -53,6 +54,7 @@ const AppRoutes = () => (
           />
           <Route path="/barn-records" element={<BarnRecords />} />
           <Route path="/reports" element={<Reports />} />
+             <Route path="/manage_staff" element={<ManageStaff />} />
         </Route>
       </Route>
     </Routes>
