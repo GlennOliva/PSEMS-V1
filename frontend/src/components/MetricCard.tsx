@@ -13,7 +13,7 @@ interface MetricCardProps {
   };
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon, color, trend }) => {
+const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon, color }) => {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600 border-blue-200',
     green: 'bg-green-50 text-green-600 border-green-200',

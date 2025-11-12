@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {  Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import logo from '../images/image-removebg-preview.png'
 import axios from 'axios';
 import Snackbar from '@mui/material/Snackbar';
@@ -143,9 +143,9 @@ const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
                 />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
-              <a href="#" className="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
+              {/* <a href="#" className="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
                 Forgot password?
-              </a>
+              </a> */}
             </div>
 
             {/* Submit Button */}
