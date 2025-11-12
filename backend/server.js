@@ -14,6 +14,9 @@ const growthTrackingRoutes = require('./routes/GrowthTrackingRoutes');
 const harvestDataRoutes = require('./routes/HarvestDataRoutes');
 const mortalityDataRoutes = require('./routes/MortalityDataRoutes')
 const monthlyForecastRoutes = require('./routes/ForecastRoutes');
+const sensorRoutes = require('./routes/SensorRoutes');
+const reportRoutes = require('./routes/ReportRoutes');
+
 
 
 
@@ -30,6 +33,8 @@ app.use('/api/growth_tracking', growthTrackingRoutes);
 app.use('/api/harvest_data', harvestDataRoutes);
 app.use('/api/mortality_data', mortalityDataRoutes);
 app.use('/api/monthly_forecast', monthlyForecastRoutes);
+app.use('/api/sensor', sensorRoutes);
+app.use('/api/reports', reportRoutes);
 const PORT = process.env.PORT || 8081;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 

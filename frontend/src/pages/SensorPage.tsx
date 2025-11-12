@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar, Filter } from 'lucide-react';
 import { SensorReading } from '../types/index';
-import { generateMockSensorData } from  '../utils/mockData';
-import Table from '../components/Table';
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue } from "firebase/database";
+import axios from 'axios';
+
+const firebaseConfig = {
+  databaseURL: "https://psemsapp-6ea85-default-rtdb.asia-southeast1.firebasedatabase.app",
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getDatabase(firebaseApp);
 
 interface SensorPageProps {
   title: string;
@@ -14,34 +21,116 @@ interface SensorPageProps {
 const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
   const [dateRange, setDateRange] = useState('7');
   const [statusFilter, setStatusFilter] = useState('all');
+    const [sensorData, setSensorData] = useState<SensorReading[]>([]);
+    const apiUrls = import.meta.env.VITE_API_URL;
+  const currentUserId = localStorage.getItem('user_id');
+
+
+      // Listen to Firebase environment data
+  useEffect(() => {
+    const envRef = ref(db, "environment");
+
+  onValue(envRef, async (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    const now = new Date();
+    const date = now.toISOString().split('T')[0];
+    const time = now.toTimeString().split(' ')[0];
+
+    // Helper to classify status
+    const classifyStatus = (type: string, value: number) => {
+      switch (type) {
+        case "temperature":
+          if (value > 35) return "Critical";
+          if (value > 30) return "Warning";
+          return "Normal";
+        case "humidity":
+          if (value > 85) return "Warning";
+          return "Normal";
+        case "nh3":
+          if (value > 10) return "Critical";
+          if (value > 5) return "Warning";
+          return "Normal";
+        case "co2":
+          if (value > 1200) return "Critical";
+          if (value > 1000) return "Warning";
+          return "Normal";
+        default:
+          return "Normal";
+      }
+    };
+
+    // Build all readings
+    const readings = [
+      { type: "temperature", value: data.temperature },
+      { type: "humidity", value: data.humidity },
+      { type: "ammonia", value: data.nh3 },
+      { type: "co2", value: data.co2 }
+    ];
+
+    for (const r of readings) {
+      const newReading: SensorReading = {
+        date,
+        time,
+        value: r.value,
+        status: classifyStatus(r.type, r.value),
+        id: ''
+      };
+
+      setSensorData(prev => [newReading, ...prev]);
+
+      // Prepare payload & API
+      let apiUrl = '';
+      let payload: any = {
+        user_id: currentUserId,
+        date,
+        time,
+        status: newReading.status
+      };
+
+      switch (r.type) {
+        case "temperature":
+          apiUrl = `${apiUrls}/api/sensor/temperature`;
+          payload.temperature_celcius = r.value;
+          break;
+        case "humidity":
+          apiUrl = `${apiUrls}/api/sensor/humidity`;
+          payload.humidity_percentage = r.value;
+          break;
+        case "ammonia":
+          apiUrl = `${apiUrls}/api/sensor/ammonia`;
+          payload.ammonia_ppm = r.value;
+          break;
+        case "co2":
+          apiUrl = `${apiUrls}/api/sensor/carbon`;
+          payload.carbon_ppm = r.value;
+          break;
+      }
+
+      await axios.post(apiUrl, payload);
+    }
+  }
+});
+  }, [sensorType]);
+
+
   
-  const sensorData = generateMockSensorData(sensorType, parseInt(dateRange));
-  
-  // Prepare hourly average data for chart
+  // Prepare chart data
   const chartData = sensorData.reduce((acc: any[], reading) => {
     const timeKey = reading.time;
     const existing = acc.find(item => item.time === timeKey);
-    
     if (existing) {
       existing.count++;
       existing.totalValue += reading.value;
       existing.value = existing.totalValue / existing.count;
     } else {
-      acc.push({
-        time: timeKey,
-        value: reading.value,
-        totalValue: reading.value,
-        count: 1
-      });
+      acc.push({ time: timeKey, value: reading.value, totalValue: reading.value, count: 1 });
     }
-    
     return acc;
   }, []).sort((a, b) => a.time.localeCompare(b.time));
 
   // Filter logs based on status
-  const filteredLogs = statusFilter === 'all' 
-    ? sensorData 
-    : sensorData.filter(reading => reading.status.toLowerCase() === statusFilter);
+  const filteredLogs = statusFilter === 'all' ? sensorData : sensorData.filter(r => r.status.toLowerCase() === statusFilter);
 
   const columns = [
     { key: 'date', label: 'Date', sortable: true },
@@ -56,20 +145,10 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
       Warning: 'bg-yellow-100 text-yellow-800',
       Critical: 'bg-red-100 text-red-800'
     };
-    
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status as keyof typeof colors]}`}>
-        {status}
-      </span>
-    );
+    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status as keyof typeof colors]}`}>{status}</span>;
   };
 
-  // Format data for table display
-  const tableData = filteredLogs.map(reading => ({
-    ...reading,
-    value: `${reading.value.toFixed(2)} ${unit}`,
-    status: getStatusBadge(reading.status)
-  }));
+  const tableData = filteredLogs.map(r => ({ ...r, value: `${r.value.toFixed(2)} ${unit}`, status: getStatusBadge(r.status) }));
 
   return (
     <div className="space-y-6">

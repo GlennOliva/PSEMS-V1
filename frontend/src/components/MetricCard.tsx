@@ -3,7 +3,7 @@ import { type LucideIcon} from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
-  value: string;
+  value: number;
   unit?: string;
   icon: LucideIcon;          // ✅ now a proper type
   color: 'blue' | 'green' | 'yellow' | 'red';
@@ -37,13 +37,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon,
             <p className="text-2xl font-bold text-gray-900">{value}</p>
             {unit && <span className="ml-1 text-sm text-gray-500">{unit}</span>}
           </div>
-          {trend && (
-            <div className={`flex items-center mt-2 text-sm ${
-              trend.isPositive ? 'text-green-600' : 'text-red-600'
-            }`}>
-              <span>{trend.isPositive ? '↗' : '↘'} {Math.abs(trend.value)}%</span>
-            </div>
-          )}
+          
         </div>
         <div className={`p-3 rounded-lg ${iconBgClasses[color]}`}>
           <Icon className="h-6 w-6" />
