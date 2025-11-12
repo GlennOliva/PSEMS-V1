@@ -81,16 +81,15 @@ const formatted = data.map((item: { barn_name: any; quantity: any; cause: any; }
  const [forecastData, setForecastData] = useState([]);
 
 useEffect(() => {
-  if (!currentUserId) return;
-
-  fetch(`${apiUrl}/api/monthly_forecast/${currentUserId}`)
+  fetch(`${apiUrl}/api/monthly_forecast/`)
     .then(res => {
       if (!res.ok) throw new Error('Network response was not ok');
       return res.json();
     })
-    .then(data => setForecastData(data))   // ✅ correct setter
+    .then(data => setForecastData(data))
     .catch(err => console.error('Error fetching forecast:', err));
-}, [apiUrl, currentUserId]);
+}, [apiUrl]); // ✅ only apiUrl is needed
+
 
 
 
