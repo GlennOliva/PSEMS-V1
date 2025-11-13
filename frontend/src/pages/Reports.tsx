@@ -68,13 +68,12 @@ const Reports: React.FC = () => {
 
   // ---------- Forecast Data ----------
   useEffect(() => {
-    if (!currentUserId) return;
 
-    fetch(`${apiUrl}/api/monthly_forecast/${currentUserId}`)
+    fetch(`${apiUrl}/api/monthly_forecast/`)
       .then(res => res.json())
       .then((data: Forecast[]) => setForecastData(data))
       .catch(err => console.error('Error fetching forecast:', err));
-  }, [apiUrl, currentUserId]);
+  }, [apiUrl]);
 
   // ---------- Batch Reports ----------
   useEffect(() => {
