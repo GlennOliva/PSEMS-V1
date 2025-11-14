@@ -1,8 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const smsRoute = require('./routes/SmsRoutes'); // CommonJS
 const app = express();
-app.use(cors());
 require('dotenv').config();
+
+// middlewares
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// routes
+app.use('/api/sms', smsRoute);
 const db = require('./config/db')
 const userRoutes = require('./routes/UserRoutes');
 const barnRoutes = require('./routes/BarnRoutes');
@@ -21,6 +29,7 @@ const reportRoutes = require('./routes/ReportRoutes');
 
 
 
+app.use('/api/sms', smsRoute);
 app.use(express.json()); // <– parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // <– parse form data
 app.use('/api/user', userRoutes);

@@ -29,7 +29,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
     no_chicken: "",
     date_started: "",
     date_completed: "",
-    status: "Active" as "Active" | "Completed" | "Terminated",
+    status: "",
   });
 
   const [barns, setBarns] = useState<{ id: number; barn_name: string }[]>([]);
@@ -67,8 +67,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
     if (isOpen) fetchBarns();
   }, [isOpen]);
 
-  // Prefill when editing
- useEffect(() => {
+useEffect(() => {
   if (batch && mode === "edit") {
     setFormData({
       id: batch.id.toString(),
@@ -78,11 +77,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
       no_chicken: batch.no_chicken?.toString() ?? "",
       date_started: batch.date_started,
       date_completed: batch.date_completed || "",
-status:
-  typeof batch.status === "string"
-    ? batch.status
-    : (batch.status as any)?.value || "Active",
-
+      status: batch.date_completed ? "Completed" : "Active", // auto-set based on date_completed
     });
   } else {
     setFormData({
@@ -93,18 +88,38 @@ status:
       no_chicken: "",
       date_started: "",
       date_completed: "",
-      status: "Active",
+      status: "Active", // default for new batch
     });
   }
 }, [batch, mode, isOpen]);
 
 
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+
+
+
+const handleChange = (
+  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+) => {
+  const { name, value } = e.target;
+
+  setFormData((prev) => {
+    let updated = { ...prev, [name]: value };
+
+    // ✅ Auto-status logic: Active if no date_completed, Completed if date_completed is set
+    if (name === "date_completed") {
+      updated.status = value ? "Completed" : "Active";
+    }
+
+    return updated;
+  });
+};
+
+
+
+
+
+
 
   const handleSnackbarClose = (
     _event?: React.SyntheticEvent | Event,
@@ -261,6 +276,7 @@ status:
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
+                disabled={formData.status === "Completed"} // disable if completed
             />
           </div>
 
@@ -296,6 +312,7 @@ status:
               min={1}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
+                disabled={formData.status === "Completed"} // disable if completed
             />
           </div>
 
@@ -305,13 +322,16 @@ status:
               Date Started
             </label>
             <input
-              type="date"
-              name="date_started"
-              value={formData.date_started}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
+  type="date"
+  name="date_started"
+  value={formData.date_started}
+  onChange={handleChange}
+  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+  max={new Date().toISOString().split("T")[0]} // today as max
+  required
+
+/>
+
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -323,26 +343,33 @@ status:
               value={formData.date_completed}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+
+           />
           </div>
 
-          {/* Status */}
+          {/* Status
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Status
             </label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            >
-              <option value="Active">Active</option>
-              <option value="Completed">Completed</option>
-              <option value="Terminated">Terminated</option>
-            </select>
-          </div>
+          <select
+  name="status"
+  value={formData.status}
+  onChange={handleChange}
+  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+  required
+
+>
+  <option value="" disabled>
+    Select Status
+  </option>
+  <option value="Active">Active</option>
+  <option value="Completed">Completed</option>
+  <option value="Terminated">Terminated</option>
+</select>
+
+
+          </div> */}
 
           {/* Buttons */}
           <div className="flex justify-end space-x-3 pt-4">

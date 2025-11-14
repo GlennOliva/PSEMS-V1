@@ -3,7 +3,7 @@ export interface SensorReading {
   date: string;
   time: string;
   value: number;
-  status: 'Normal' | 'Warning' | 'Critical';
+  status: string;
 }
 
 export interface Barn {
@@ -33,7 +33,7 @@ export interface Batch {
   no_chicken: number;
   date_started: string;
   date_completed?: string | null;
-  status: "Active" | "Completed" | "Terminated";
+  status: string;
 }
 
 

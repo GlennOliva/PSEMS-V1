@@ -1,19 +1,20 @@
 import React from 'react';
-import { type LucideIcon} from 'lucide-react';
+import { type LucideIcon } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
   value: number;
   unit?: string;
-  icon: LucideIcon;          // ✅ now a proper type
+  icon: LucideIcon;
   color: 'blue' | 'green' | 'yellow' | 'red';
   trend?: {
     value: number;
     isPositive: boolean;
   };
+  status?: 'Normal' | 'Warning' | 'Critical';
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon, color }) => {
+const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon, color, status }) => {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600 border-blue-200',
     green: 'bg-green-50 text-green-600 border-green-200',
@@ -28,6 +29,12 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon,
     red: 'bg-red-100'
   };
 
+  const statusClasses = {
+    Normal: 'text-green-600',
+    Warning: 'text-yellow-600',
+    Critical: 'text-red-600',
+  };
+
   return (
     <div className={`rounded-xl border p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${colorClasses[color]}`}>
       <div className="flex items-center justify-between">
@@ -37,7 +44,11 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon,
             <p className="text-2xl font-bold text-gray-900">{value}</p>
             {unit && <span className="ml-1 text-sm text-gray-500">{unit}</span>}
           </div>
-          
+          {status && (
+            <p className={`mt-1 text-sm font-medium ${statusClasses[status]}`}>
+              {status}
+            </p>
+          )}
         </div>
         <div className={`p-3 rounded-lg ${iconBgClasses[color]}`}>
           <Icon className="h-6 w-6" />
