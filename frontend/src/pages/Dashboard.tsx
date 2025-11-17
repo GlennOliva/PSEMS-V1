@@ -60,9 +60,6 @@ Thank you for using PSEMS.
 
 
 
-
-
-
    useEffect(() => {
     if (!currentUserId) {
       console.warn('No user_id in localStorage');
