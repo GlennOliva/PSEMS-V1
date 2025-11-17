@@ -60,55 +60,61 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
       }
     };
 
-    // Build all readings
-    const readings = [
-      { type: "temperature", value: data.temperature },
-      { type: "humidity", value: data.humidity },
-      { type: "ammonia", value: data.nh3 },
-      { type: "co2", value: data.co2 }
-    ];
+const readingMap: any = {
+  temperature: data.temperature,
+  humidity: data.humidity,
+  nh3: data.nh3,
+  co2: data.co2
+};
 
-    for (const r of readings) {
-      const newReading: SensorReading = {
-        date,
-        time,
-        value: r.value,
-        status: classifyStatus(r.type, r.value),
-        id: ''
-      };
+const sensorValue = readingMap[sensorType];
 
-      setSensorData(prev => [newReading, ...prev]);
 
-      // Prepare payload & API
-      let apiUrl = '';
-      let payload: any = {
-        user_id: currentUserId,
-        date,
-        time,
-        status: newReading.status
-      };
 
-      switch (r.type) {
-        case "temperature":
-          apiUrl = `${apiUrls}/api/sensor/temperature`;
-          payload.temperature_celcius = r.value;
-          break;
-        case "humidity":
-          apiUrl = `${apiUrls}/api/sensor/humidity`;
-          payload.humidity_percentage = r.value;
-          break;
-        case "ammonia":
-          apiUrl = `${apiUrls}/api/sensor/ammonia`;
-          payload.ammonia_ppm = r.value;
-          break;
-        case "co2":
-          apiUrl = `${apiUrls}/api/sensor/carbon`;
-          payload.carbon_ppm = r.value;
-          break;
-      }
+    if (sensorValue !== undefined) {
+  const newReading: SensorReading = {
+    date,
+    time,
+    value: sensorValue,
+    status: classifyStatus(sensorType, sensorValue),
+    id: ''
+  };
 
-      await axios.post(apiUrl, payload);
-    }
+  setSensorData(prev => [newReading, ...prev]);
+
+  let apiUrl = '';
+  let payload: any = {
+    user_id: currentUserId,
+    date,
+    time,
+    status: newReading.status
+  };
+
+  switch (sensorType) {
+    case "temperature":
+      apiUrl = `${apiUrls}/api/sensor/temperature`;
+      payload.temperature_celcius = sensorValue;
+      break;
+
+    case "humidity":
+      apiUrl = `${apiUrls}/api/sensor/humidity`;
+      payload.humidity_percentage = sensorValue;
+      break;
+
+    case "nh3":
+      apiUrl = `${apiUrls}/api/sensor/ammonia`;
+      payload.ammonia_ppm = sensorValue;
+      break;
+
+    case "co2":
+      apiUrl = `${apiUrls}/api/sensor/carbon`;
+      payload.carbon_ppm = sensorValue;
+      break;
+  }
+
+  await axios.post(apiUrl, payload);
+}
+
   }
 });
   }, [sensorType]);
