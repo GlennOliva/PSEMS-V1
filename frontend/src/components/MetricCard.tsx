@@ -1,6 +1,21 @@
 import React from 'react';
 import { type LucideIcon } from 'lucide-react';
 
+type Status =
+  | 'Normal - 18°C to 30°C'
+  | 'Harmful - May cause stress or illness'
+  | 'Harmful - Risk of heat stress or death'
+  | 'Normal - 50% to 70%'
+  | 'Warning - May cause dehydration, respiratory stress, poor air quality'
+  | 'Warning - Increased risk of disease'
+  | 'Safe - Normal ventilation'
+  | 'Ventilation should be improved; Acceptable short-term - Mild stress'
+  | 'Hazardous - Respiratory distress; immediate ventilation improvement is required'
+  | 'Ideal (Safe) - Best condition. No harm to poultry or workers. Promotes healthy growth & respiration'
+  | 'Acceptable (Not Ideal) - Prolonged exposure may cause mild stress or irritation. Improve litter/ventilation'
+  | 'Harmful - Unsafe. Risk of respiratory disease, eye irritation, poor growth. Immediate action needed';
+
+
 interface MetricCardProps {
   title: string;
   value: number;
@@ -11,7 +26,7 @@ interface MetricCardProps {
     value: number;
     isPositive: boolean;
   };
-  status?: 'Normal' | 'Warning' | 'Critical';
+ status?: Status;
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon, color, status }) => {
@@ -29,11 +44,15 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon,
     red: 'bg-red-100'
   };
 
-  const statusClasses = {
-    Normal: 'text-green-600',
-    Warning: 'text-yellow-600',
-    Critical: 'text-red-600',
-  };
+  const getStatusClass = (status: Status) => {
+  if (
+    status.includes('Harmful') ||
+    status.includes('Hazardous') ||
+    status.includes('Risk')
+  ) return 'text-red-600';
+  if (status.includes('Warning') || status.includes('Acceptable')) return 'text-yellow-600';
+  return 'text-green-600'; // Normal / Safe / Ideal
+};
 
   return (
     <div className={`rounded-xl border p-6 transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${colorClasses[color]}`}>
@@ -44,11 +63,12 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, unit, icon: Icon,
             <p className="text-2xl font-bold text-gray-900">{value}</p>
             {unit && <span className="ml-1 text-sm text-gray-500">{unit}</span>}
           </div>
-          {status && (
-            <p className={`mt-1 text-sm font-medium ${statusClasses[status]}`}>
-              {status}
-            </p>
-          )}
+     {status && (
+  <p className={`mt-1 text-sm font-medium ${getStatusClass(status)}`}>
+    {status}
+  </p>
+)}
+
         </div>
         <div className={`p-3 rounded-lg ${iconBgClasses[color]}`}>
           <Icon className="h-6 w-6" />

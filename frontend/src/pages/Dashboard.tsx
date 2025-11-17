@@ -149,7 +149,7 @@ useEffect(() => {
     });
   }, []);
 
-type Status = 'Normal' | 'Warning' | 'Critical';
+
 
 type Sensor = {
   value: number;
@@ -166,37 +166,58 @@ type SensorData = {
 
 
 const [sensorData, setSensorData] = useState<SensorData>({
-  temperature: { value: 0, status: 'Normal', updatedAt: undefined },
-  humidity: { value: 0, status: 'Normal', updatedAt: undefined },
-  ammonia: { value: 0, status: 'Normal', updatedAt: undefined },
-  carbon: { value: 0, status: 'Normal', updatedAt: undefined },
+  temperature: { value: 0, status: 'Normal - 18°C to 30°C', updatedAt: undefined },
+  humidity: { value: 0, status: 'Normal - 50% to 70%', updatedAt: undefined },
+  ammonia: { value: 0, status: 'Ideal (Safe) - Best condition. No harm to poultry or workers. Promotes healthy growth & respiration', updatedAt: undefined },
+  carbon: { value: 0, status: 'Safe - Normal ventilation', updatedAt: undefined },
 });
 
 
 
 
- // Helper to classify status
-  const classifyStatus = (type: string, value: number) => {
-    switch (type) {
-      case 'temperature':
-        if (value > 35) return 'Critical';
-        if (value > 30) return 'Warning';
-        return 'Normal';
-      case 'humidity':
-        if (value > 85) return 'Warning';
-        return 'Normal';
-      case 'nh3':
-        if (value > 10) return 'Critical';
-        if (value > 5) return 'Warning';
-        return 'Normal';
-      case 'co2':
-        if (value > 1200) return 'Critical';
-        if (value > 1000) return 'Warning';
-        return 'Normal';
-      default:
-        return 'Normal';
-    }
-  };
+// Make sure Status type is imported or defined
+type Status =
+  | 'Normal - 18°C to 30°C'
+  | 'Harmful - May cause stress or illness'
+  | 'Harmful - Risk of heat stress or death'
+  | 'Normal - 50% to 70%'
+  | 'Warning - May cause dehydration, respiratory stress, poor air quality'
+  | 'Warning - Increased risk of disease'
+  | 'Safe - Normal ventilation'
+  | 'Ventilation should be improved; Acceptable short-term - Mild stress'
+  | 'Hazardous - Respiratory distress; immediate ventilation improvement is required'
+  | 'Ideal (Safe) - Best condition. No harm to poultry or workers. Promotes healthy growth & respiration'
+  | 'Acceptable (Not Ideal) - Prolonged exposure may cause mild stress or irritation. Improve litter/ventilation'
+  | 'Harmful - Unsafe. Risk of respiratory disease, eye irritation, poor growth. Immediate action needed';
+
+const classifyStatus = (type: string, value: number): Status => {
+  switch (type) {
+    case 'temperature':
+      if (value < 18) return 'Harmful - May cause stress or illness';
+      if (value > 30) return 'Harmful - Risk of heat stress or death';
+      return 'Normal - 18°C to 30°C';
+
+    case 'humidity':
+      if (value < 50) return 'Warning - May cause dehydration, respiratory stress, poor air quality';
+      if (value > 70) return 'Warning - Increased risk of disease';
+      return 'Normal - 50% to 70%';
+
+    case 'co2':
+      if (value >= 3000) return 'Hazardous - Respiratory distress; immediate ventilation improvement is required';
+      if (value >= 2500) return 'Ventilation should be improved; Acceptable short-term - Mild stress';
+      return 'Safe - Normal ventilation';
+
+    case 'nh3':
+      if (value > 25) return 'Harmful - Unsafe. Risk of respiratory disease, eye irritation, poor growth. Immediate action needed';
+      if (value > 10) return 'Acceptable (Not Ideal) - Prolonged exposure may cause mild stress or irritation. Improve litter/ventilation';
+      return 'Ideal (Safe) - Best condition. No harm to poultry or workers. Promotes healthy growth & respiration';
+
+    default:
+      return 'Normal - 18°C to 30°C'; // fallback, must be a valid Status
+  }
+};
+
+
 
    // Firebase Listener
   useEffect(() => {
@@ -212,13 +233,16 @@ const [sensorData, setSensorData] = useState<SensorData>({
       const sensors: (keyof SensorData)[] = ['temperature', 'humidity', 'ammonia', 'carbon'];
       const newSensorData: SensorData = { ...sensorData };
 
-      sensors.forEach(sensor => {
-        const key = sensor === 'ammonia' ? 'nh3' : sensor === 'carbon' ? 'co2' : sensor;
-        const value = data[key];
-        const status = classifyStatus(key, value);
-        newSensorData[sensor] = { value, status, updatedAt: status !== 'Normal' ? new Date() : undefined };
-        if (status !== 'Normal') sendSMSNotification(`${sensor.toUpperCase()} is ${status}! Value: ${value}`);
-      });
+    sensors.forEach(sensor => {
+  const key = sensor === 'ammonia' ? 'nh3' : sensor === 'carbon' ? 'co2' : sensor;
+  const value = data[key];
+  const status = classifyStatus(key, value); // returns Status
+  newSensorData[sensor] = { value, status, updatedAt: !status.includes('Normal') && !status.includes('Safe') && !status.includes('Ideal') ? new Date() : undefined };
+  if (!status.includes('Normal') && !status.includes('Safe') && !status.includes('Ideal')) {
+    sendSMSNotification(`${sensor.toUpperCase()} is ${status}! Value: ${value}`);
+  }
+});
+
 
       setSensorData(newSensorData);
     });
