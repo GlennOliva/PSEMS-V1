@@ -45,7 +45,7 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
   useEffect(() => {
     const envRef = ref(db, "environment");
 
-  onValue(envRef, async (snapshot) => {
+  const unsub = onValue(envRef, async (snapshot) => {
   const data = snapshot.val();
   if (data) {
     const now = new Date();
@@ -91,52 +91,56 @@ const sensorValue = readingMap[sensorType];
 
 
 
-    if (sensorValue !== undefined) {
-  const newReading: SensorReading = {
-    date,
-    time,
-    value: sensorValue,
-    status: classifyStatus(sensorType, sensorValue),
-    id: ''
-  };
+  if (sensorValue !== undefined) {
+    const newReading: SensorReading = {
+        date,
+        time,
+        value: sensorValue,
+        status: classifyStatus(sensorType, sensorValue),
+        id: ''
+    };
 
-  setSensorData(prev => [newReading, ...prev]);
+    // Save only readings for the current sensorType
+    setSensorData(prev => [newReading, ...prev]);
 
-  let apiUrl = '';
-  let payload: any = {
-    user_id: currentUserId,
-    date,
-    time,
-    status: newReading.status
-  };
+    let apiUrl = '';
+    let payload: any = {
+        user_id: currentUserId,
+        date,
+        time,
+        status: newReading.status
+    };
 
-  switch (sensorType) {
-    case "temperature":
-      apiUrl = `${apiUrls}/api/sensor/temperature`;
-      payload.temperature_celcius = sensorValue;
-      break;
+    switch (sensorType) {
+        case "temperature":
+            apiUrl = `${apiUrls}/api/sensor/temperature`;
+            payload.temperature_celcius = sensorValue;
+            break;
 
-    case "humidity":
-      apiUrl = `${apiUrls}/api/sensor/humidity`;
-      payload.humidity_percentage = sensorValue;
-      break;
+        case "humidity":
+            apiUrl = `${apiUrls}/api/sensor/humidity`;
+            payload.humidity_percentage = sensorValue;
+            break;
 
-    case "nh3":
-      apiUrl = `${apiUrls}/api/sensor/ammonia`;
-      payload.ammonia_ppm = sensorValue;
-      break;
+        case "nh3":
+            apiUrl = `${apiUrls}/api/sensor/ammonia`;
+            payload.ammonia_ppm = sensorValue;
+            break;
 
-    case "co2":
-      apiUrl = `${apiUrls}/api/sensor/carbon`;
-      payload.carbon_ppm = sensorValue;
-      break;
-  }
+        case "co2":
+            apiUrl = `${apiUrls}/api/sensor/carbon`;
+            payload.carbon_ppm = sensorValue;
+            break;
+    }
 
-  await axios.post(apiUrl, payload);
+    await axios.post(apiUrl, payload);
 }
+
 
   }
 });
+
+   return () => unsub();
   }, [sensorType]);
 
 
