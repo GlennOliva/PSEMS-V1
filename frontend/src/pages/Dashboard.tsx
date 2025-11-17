@@ -28,7 +28,22 @@ const Dashboard: React.FC = () => {
 
 
 const sendSMSNotification = async (message: string) => {
-  const phoneNumber = '+639938374992'; // target number
+  const phoneNumber = '+639938374992';
+  const cooldownMinutes = 30;
+
+  // Get last sent timestamp
+  const lastSent = localStorage.getItem('last_sms_sent');
+  const now = Date.now();
+
+  if (lastSent) {
+    const elapsedMinutes = (now - Number(lastSent)) / 1000 / 60;
+
+    // Block SMS if still within cooldown
+    if (elapsedMinutes < cooldownMinutes) {
+      console.log(`⏳ SMS blocked – wait ${Math.ceil(cooldownMinutes - elapsedMinutes)} more minutes.`);
+      return;
+    }
+  }
 
   // Professional branded message
   const professionalMessage = `
@@ -43,19 +58,24 @@ Thank you for using PSEMS.
     const res = await fetch(`${apiUrl}/api/sms/send-sms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        phone: phoneNumber, 
+      body: JSON.stringify({
+        phone: phoneNumber,
         message: professionalMessage,
-        sender: 'PSEMS SMART BOT' // <-- set custom sender
+        sender: 'PSEMS SMART BOT'
       })
     });
 
     const data = await res.json();
     console.log('SMS sent via proxy:', data);
+
+    // Save timestamp after successful send
+    localStorage.setItem('last_sms_sent', now.toString());
+
   } catch (err) {
     console.error('SMS failed:', err);
   }
 };
+
 
 
 
