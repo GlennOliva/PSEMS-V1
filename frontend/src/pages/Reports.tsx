@@ -223,7 +223,7 @@ const Reports: React.FC = () => {
           <body>
             <div class="header">
               <img src="${logo}" alt="PSEMS Logo" />
-              <h1>POULTRY SMART ENVIRONMENT MONITORING SYSTEM</h1>
+              <h1>POULTRY SENSE ENVIRONMENTAL MONITORING SYSTEM</h1>
               <h3>Farm Monthly Report: ${monthDisplay}</h3>
             </div>
             <div class="date">Date: ${new Date().toLocaleDateString()}</div>
