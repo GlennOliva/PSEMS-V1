@@ -214,14 +214,41 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
     { key: 'status', label: 'Status', sortable: true }
   ];
 
-  const getStatusBadge = (status: string) => {
-    const colors = {
-      Normal: 'bg-green-100 text-green-800',
-      Warning: 'bg-yellow-100 text-yellow-800',
-      Critical: 'bg-red-100 text-red-800'
-    };
-    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status as keyof typeof colors]}`}>{status}</span>;
-  };
+const getStatusBadge = (status: string) => {
+  let badgeClass = "";
+
+  if (
+    status.startsWith("Normal") ||
+    status.startsWith("Safe") ||
+    status.startsWith("Ideal")
+  ) {
+    badgeClass = "bg-green-100 text-green-800";
+  } 
+  else if (
+    status.startsWith("Warning") ||
+    status.startsWith("Acceptable") ||
+    status.includes("improved") // CO2 mild warning
+  ) {
+    badgeClass = "bg-yellow-100 text-yellow-800";
+  } 
+  else if (
+    status.startsWith("Harmful") ||
+    status.startsWith("Critical") ||
+    status.startsWith("Hazardous")
+  ) {
+    badgeClass = "bg-red-100 text-red-800";
+  } 
+  else {
+    badgeClass = "bg-gray-100 text-gray-800";
+  }
+
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeClass}`}>
+      {status}
+    </span>
+  );
+};
+
 
   const tableData = filteredLogs.map(r => ({ ...r, value: `${r.value.toFixed(2)} ${unit}`, status: getStatusBadge(r.status) }));
 
