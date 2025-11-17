@@ -41,107 +41,107 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
   const currentUserId = localStorage.getItem('user_id');
 
 
-      // Listen to Firebase environment data
-  useEffect(() => {
-    const envRef = ref(db, "environment");
+ useEffect(() => {
+  const envRef = ref(db, "environment");
+
+  // Clear old logs when switching sensors
+  setSensorData([]);
 
   const unsub = onValue(envRef, async (snapshot) => {
-  const data = snapshot.val();
-  if (data) {
+    const data = snapshot.val();
+    if (!data) return;
+
     const now = new Date();
-    const date = now.toISOString().split('T')[0];
-    const time = now.toTimeString().split(' ')[0];
+    const date = now.toISOString().split("T")[0];
+    const time = now.toTimeString().split(" ")[0];
 
-    // Helper to classify status
-   const classifyStatus = (type: string, value: number): Status => {
-  switch (type) {
-    case 'temperature':
-      if (value < 18) return 'Harmful - May cause stress or illness';
-      if (value > 30) return 'Harmful - Risk of heat stress or death';
-      return 'Normal - 18°C to 30°C';
-
-    case 'humidity':
-      if (value < 50) return 'Warning - May cause dehydration, respiratory stress, poor air quality';
-      if (value > 70) return 'Warning - Increased risk of disease';
-      return 'Normal - 50% to 70%';
-
-    case 'co2':
-      if (value >= 3000) return 'Hazardous - Respiratory distress; immediate ventilation improvement is required';
-      if (value >= 2500) return 'Ventilation should be improved; Acceptable short-term - Mild stress';
-      return 'Safe - Normal ventilation';
-
-    case 'nh3':
-      if (value > 25) return 'Harmful - Unsafe. Risk of respiratory disease, eye irritation, poor growth. Immediate action needed';
-      if (value > 10) return 'Acceptable (Not Ideal) - Prolonged exposure may cause mild stress or irritation. Improve litter/ventilation';
-      return 'Ideal (Safe) - Best condition. No harm to poultry or workers. Promotes healthy growth & respiration';
-
-    default:
-      return 'Normal - 18°C to 30°C'; // fallback, must be a valid Status
-  }
-};
-
-const readingMap: any = {
-  temperature: data.temperature,
-  humidity: data.humidity,
-  nh3: data.nh3,
-  co2: data.co2
-};
-
-const sensorValue = readingMap[sensorType];
-
-
-
-  if (sensorValue !== undefined) {
-    const newReading: SensorReading = {
-        date,
-        time,
-        value: sensorValue,
-        status: classifyStatus(sensorType, sensorValue),
-        id: ''
-    };
-
-    // Save only readings for the current sensorType
-    setSensorData(prev => [newReading, ...prev]);
-
-    let apiUrl = '';
-    let payload: any = {
-        user_id: currentUserId,
-        date,
-        time,
-        status: newReading.status
-    };
-
-    switch (sensorType) {
+    const classifyStatus = (type: string, value: number): Status => {
+      switch (type) {
         case "temperature":
-            apiUrl = `${apiUrls}/api/sensor/temperature`;
-            payload.temperature_celcius = sensorValue;
-            break;
+          if (value < 18) return "Harmful - May cause stress or illness";
+          if (value > 30) return "Harmful - Risk of heat stress or death";
+          return "Normal - 18°C to 30°C";
 
         case "humidity":
-            apiUrl = `${apiUrls}/api/sensor/humidity`;
-            payload.humidity_percentage = sensorValue;
-            break;
-
-        case "nh3":
-            apiUrl = `${apiUrls}/api/sensor/ammonia`;
-            payload.ammonia_ppm = sensorValue;
-            break;
+          if (value < 50) return "Warning - May cause dehydration, respiratory stress, poor air quality";
+          if (value > 70) return "Warning - Increased risk of disease";
+          return "Normal - 50% to 70%";
 
         case "co2":
-            apiUrl = `${apiUrls}/api/sensor/carbon`;
-            payload.carbon_ppm = sensorValue;
-            break;
+          if (value >= 3000) return "Hazardous - Respiratory distress; immediate ventilation improvement is required";
+          if (value >= 2500) return "Ventilation should be improved; Acceptable short-term - Mild stress";
+          return "Safe - Normal ventilation";
+
+        case "ammonia":
+          if (value > 25) return "Harmful - Unsafe. Risk of respiratory disease, eye irritation, poor growth. Immediate action needed";
+          if (value > 10) return "Acceptable (Not Ideal) - Prolonged exposure may cause mild stress or irritation. Improve litter/ventilation";
+          return "Ideal (Safe) - Best condition. No harm to poultry or workers. Promotes healthy growth & respiration";
+
+        default:
+          return "Normal - 18°C to 30°C";
+      }
+    };
+
+    // ✅ Only pick the selected sensor value
+    let sensorValue: number | undefined = undefined;
+
+    if (sensorType === "temperature") sensorValue = data.temperature;
+    if (sensorType === "humidity") sensorValue = data.humidity;
+    if (sensorType === "ammonia") sensorValue = data.nh3;
+    if (sensorType === "co2") sensorValue = data.co2;
+
+    // ❌ If wrong sensor → skip
+    if (sensorValue === undefined) return;
+
+    // Build new reading
+    const newReading: SensorReading = {
+      date,
+      time,
+      value: sensorValue,
+      status: classifyStatus(sensorType, sensorValue),
+      id: ""
+    };
+
+    // Push only to selected sensor
+    setSensorData(prev => [newReading, ...prev]);
+
+    // SAVE TO API
+    const payload: any = {
+      user_id: currentUserId,
+      date,
+      time,
+      status: newReading.status
+    };
+
+    let apiUrl = "";
+
+    if (sensorType === "temperature") {
+      apiUrl = `${apiUrls}/api/sensor/temperature`;
+      payload.temperature_celcius = sensorValue;
+    }
+
+    if (sensorType === "humidity") {
+      apiUrl = `${apiUrls}/api/sensor/humidity`;
+      payload.humidity_percentage = sensorValue;
+    }
+
+    if (sensorType === "ammonia") {
+      apiUrl = `${apiUrls}/api/sensor/ammonia`;
+      payload.ammonia_ppm = sensorValue;
+    }
+
+    if (sensorType === "co2") {
+      apiUrl = `${apiUrls}/api/sensor/carbon`;
+      payload.carbon_ppm = sensorValue;
     }
 
     await axios.post(apiUrl, payload);
-}
 
+  });
 
-  }
-});
+  return () => unsub();
+}, [sensorType]);
 
-   return () => unsub();
-  }, [sensorType]);
 
 
   
