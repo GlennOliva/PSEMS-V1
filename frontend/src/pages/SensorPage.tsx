@@ -82,6 +82,10 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
       }
     };
 
+
+  
+
+
     // ✅ Only pick the selected sensor value
     let sensorValue: number | undefined = undefined;
 
@@ -144,6 +148,43 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
 
 
 
+  const getStatusOptions = () => {
+  switch (sensorType) {
+    case "temperature":
+      return [
+        "Normal - 18°C to 30°C",
+        "Harmful - May cause stress or illness",
+        "Harmful - Risk of heat stress or death",
+      ];
+
+    case "humidity":
+      return [
+        "Normal - 50% to 70%",
+        "Warning - May cause dehydration, respiratory stress, poor air quality",
+        "Warning - Increased risk of disease",
+      ];
+
+    case "co2":
+      return [
+        "Safe - Normal ventilation",
+        "Ventilation should be improved; Acceptable short-term - Mild stress",
+        "Hazardous - Respiratory distress; immediate ventilation improvement is required",
+      ];
+
+    case "ammonia":
+      return [
+        "Ideal (Safe) - Best condition. No harm to poultry or workers. Promotes healthy growth & respiration",
+        "Acceptable (Not Ideal) - Prolonged exposure may cause mild stress or irritation. Improve litter/ventilation",
+        "Harmful - Unsafe. Risk of respiratory disease, eye irritation, poor growth. Immediate action needed",
+      ];
+
+    default:
+      return [];
+  }
+};
+
+
+
   
   // Prepare chart data
   const chartData = sensorData.reduce((acc: any[], reading) => {
@@ -160,7 +201,11 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
   }, []).sort((a, b) => a.time.localeCompare(b.time));
 
   // Filter logs based on status
-  const filteredLogs = statusFilter === 'all' ? sensorData : sensorData.filter(r => r.status.toLowerCase() === statusFilter);
+  const filteredLogs =
+  statusFilter === "all"
+    ? sensorData
+    : sensorData.filter(r => r.status === statusFilter);
+
 
   const columns = [
     { key: 'date', label: 'Date', sortable: true },
@@ -244,15 +289,19 @@ const SensorPage: React.FC<SensorPageProps> = ({ title, unit, sensorType }) => {
       <div className="flex items-center space-x-2">
         <Filter className="h-4 w-4 text-gray-500" />
         <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">All Status</option>
-          <option value="normal">Normal</option>
-          <option value="warning">Warning</option>
-          <option value="critical">Critical</option>
-        </select>
+  value={statusFilter}
+  onChange={(e) => setStatusFilter(e.target.value)}
+  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+>
+  <option value="all">All Status</option>
+
+  {getStatusOptions().map((status, idx) => (
+    <option key={idx} value={status}>
+      {status}
+    </option>
+  ))}
+</select>
+
       </div>
     </div>
   </div>
