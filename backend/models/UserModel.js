@@ -65,3 +65,8 @@ exports.getStaffUsers = (callback) => {
   const sql = `SELECT * FROM tbl_user WHERE role = 'staff'`;
   db.query(sql, callback);
 };
+
+exports.deleteUser = (id, callback) => {
+  const sql = 'DELETE FROM tbl_user WHERE id = ?';
+  db.query(sql, [id], callback);
+};

@@ -97,3 +97,31 @@ exports.getStaffUsers = (req, res) => {
     res.json(results);
   });
 };
+
+
+// 🗑️ Delete user
+exports.deleteUser = (req, res) => {
+  const userId = req.params.id;
+
+  User.deleteUser(userId, (err, result) => {
+    if (err) {
+      console.error("Delete error:", err);
+
+      // If foreign key prevents deletion
+      if (err.code === "ER_ROW_IS_REFERENCED_2") {
+        return res.status(400).json({
+          error: "Cannot delete staff — linked records exist.",
+        });
+      }
+
+      return res.status(500).json({ error: "Failed to delete staff" });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "Staff deleted successfully!" });
+  });
+};
+
