@@ -3,8 +3,8 @@ const axios = require('axios');
 const router = express.Router();
 
 const BASE_URL = 'https://api.textbee.dev/api/v1';
-const API_KEY = '1d8b6189-f40c-4c3b-9c5d-de309f4de679';
-const DEVICE_ID = '69178678f77da59de41f4f26';
+const API_KEY = '89553bb3-7b13-413b-b875-d583048a8547';
+const DEVICE_ID = '691ceb9982033f16094df078';
 
 router.post('/send-sms', async (req, res) => {
   const { phone, message } = req.body;

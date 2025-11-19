@@ -28,7 +28,7 @@ const Dashboard: React.FC = () => {
 
 
 const sendSMSNotification = async (message: string) => {
-  const phoneNumber = '+639938374992';
+  const phoneNumber = '+639941680185';
   const cooldownMinutes = 30;
 
   // Get last sent timestamp
