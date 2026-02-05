@@ -1,5 +1,75 @@
 const Barn = require('../models/BarnModel');
 
+
+// ✅ GET /api/barn/availability/by-batch/:batchId
+exports.getAvailabilityByBatchId = (req, res) => {
+  const batchId = parseInt(req.params.batchId, 10);
+
+  if (!batchId || batchId <= 0) {
+    return res.status(400).json({ error: 'Invalid batchId' });
+  }
+
+  // 1) Find barn_id from batchId
+  Barn.getBarnIdByBatchId(batchId, (err, barnId) => {
+    if (err) {
+      console.error('Database error (getBarnIdByBatchId):', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    if (!barnId) {
+      return res.status(404).json({ message: 'Batch not found or has no barn assigned' });
+    }
+
+    // 2) Get barn info
+    Barn.getById(barnId, (err, barnRows) => {
+      if (err) {
+        console.error('Database error (getById):', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!barnRows || barnRows.length === 0) {
+        return res.status(404).json({ message: 'Barn not found' });
+      }
+
+      const barn = barnRows[0];
+
+      // 3) Count total vs harvested batches in that barn
+      Barn.getBatchCountsByBarnId(barnId, (err, countRows) => {
+        if (err) {
+          console.error('Database error (getBatchCountsByBarnId):', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        const totalBatches = Number(countRows?.[0]?.total_batches || 0);
+        const harvestedBatches = Number(countRows?.[0]?.harvested_batches || 0);
+
+        // ✅ Available when all batches in barn are harvested
+        // If barn has 0 batches, treat as available (you can change this if you want)
+        const available = totalBatches === 0 ? true : harvestedBatches >= totalBatches;
+
+        // 4) Optional: update barn status in tbl_barn
+        // Assumes tbl_barn has a column named `status` and values 'Available' / 'Occupied'
+        const newStatus = available ? 'Available' : 'Occupied';
+
+        Barn.updateStatus(barnId, newStatus, (updateErr) => {
+          if (updateErr) {
+            console.error('Database error (updateStatus):', updateErr);
+            // Don’t fail the request if status update fails — still return availability
+          }
+
+          return res.status(200).json({
+            barn_id: barn.id,
+            barn_name: barn.barn_name,
+            available,
+            total_batches: totalBatches,
+            harvested_batches: harvestedBatches,
+          });
+        });
+      });
+    });
+  });
+};
+
 // 📥 Get all Barns
 exports.getBarns = (req, res) => {
   Barn.getAll((err, results) => {

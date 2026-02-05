@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Layers, FileText, Package, TrendingUp, Skull, Warehouse } from 'lucide-react';
 import Table from '../components/Table';
 import BatchModal from '../components/BatchModal';
@@ -46,13 +46,19 @@ const BarnRecords: React.FC = () => {
     { key: 'status', label: 'Status', sortable: true }
   ];
 
-  const dailyLogColumns = [
-    { key: 'id', label: 'ID', sortable: true },
-    { key: 'batch_name', label: 'Batch NAME', sortable: true },
-    { key: 'date', label: 'Date', sortable: true },
-    { key: 'mortality_quantity', label: 'Mortality Chickens', sortable: true },
-    { key: 'feed', label: 'Feed (kg)', sortable: true }
-  ];
+const dailyLogColumns = [
+  { key: 'id', label: 'ID', sortable: true },
+  { key: 'batch_name', label: 'Batch Name', sortable: true },
+  { key: 'date', label: 'Date', sortable: true },
+
+  // ✅ Mortality Details
+  { key: 'mortality_cause', label: 'Mortality Cause', sortable: true },
+  { key: 'mortality_quantity', label: 'Mortality Qty', sortable: true },
+  { key: 'mortality_notes', label: 'Mortality Notes', sortable: false },
+
+  { key: 'feed', label: 'Feed (kg)', sortable: true }
+];
+
 
 
 
@@ -564,6 +570,40 @@ case 'growth-tracking':
 };
 
 
+
+const mortalityById = useMemo(() => {
+  const map = new Map<string, Mortality>();
+  for (const m of mortalities) map.set(String(m.id), m);
+  return map;
+}, [mortalities]);
+
+const batchById = useMemo(() => {
+  const map = new Map<string, Batch>();
+  for (const b of batches) map.set(String(b.id), b);
+  return map;
+}, [batches]);
+
+const dailyLogsWithMortalityDetails = useMemo(() => {
+  return daily_logs.map((log: any) => {
+    const mort = mortalityById.get(String(log.mortality_id));
+    const batch = batchById.get(String(log.batch_id));
+
+    return {
+      ...log,
+
+      // ✅ If API doesn't provide batch_name, derive from batches:
+      batch_name: log.batch_name ?? batch?.batch_name ?? '',
+
+      // ✅ Mortality details from mortality table
+      mortality_cause: mort?.cause ?? '—',
+      mortality_quantity: mort?.quantity ?? 0,
+      mortality_notes: mort?.notes ?? '—',
+    };
+  });
+}, [daily_logs, mortalityById, batchById]);
+
+
+
   const handleSaveDailyLog = (logData: Partial<DailyLog>) => {
     if (modalState.dailyLog.mode === 'add') {
       const newLog = {
@@ -785,17 +825,18 @@ const handleSaveMortality = (mortalityData: Partial<Mortality>) => {
             title="Batches"
           />
         );
-      case 'daily-logs':
-        return (
-          <Table
-            columns={dailyLogColumns}
-            data={daily_logs}
-            onAdd={handleAdd}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            title="Daily Logs"
-          />
-        );
+     case 'daily-logs':
+  return (
+    <Table
+      columns={dailyLogColumns}
+      data={dailyLogsWithMortalityDetails}
+      onAdd={handleAdd}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
+      title="Daily Logs"
+    />
+  );
+
       case 'harvest':
         return (
           <Table

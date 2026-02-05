@@ -133,16 +133,25 @@ const formatted = data.map((item: { barn_name: any; quantity: any; cause: any; }
 
 
  const [forecastData, setForecastData] = useState([]);
+ const [forecastFilters, setForecastFilters] = useState({
+  startDate: '',
+  endDate: '',
+  batchId: '',
+  breed: '',
+});
+
 
 useEffect(() => {
-  fetch(`${apiUrl}/api/monthly_forecast/`)
-    .then(res => {
-      if (!res.ok) throw new Error('Network response was not ok');
-      return res.json();
-    })
+  const params = new URLSearchParams(
+    Object.entries(forecastFilters).filter(([_, v]) => v !== '')
+  ).toString();
+
+  fetch(`${apiUrl}/api/monthly_forecast?${params}`)
+    .then(res => res.json())
     .then(data => setForecastData(data))
     .catch(err => console.error('Error fetching forecast:', err));
-}, [apiUrl]); // ✅ only apiUrl is needed
+}, [apiUrl, forecastFilters]);
+
 
 
 
@@ -355,6 +364,48 @@ const toggleNotifications = () => setShowNotifications(prev => !prev);
         </div>
       </div>
 
+
+      <div className="bg-white rounded-lg border p-4 mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+  
+  <input
+    type="date"
+    className="border rounded px-3 py-2"
+    onChange={e => setForecastFilters({ ...forecastFilters, startDate: e.target.value })}
+  />
+
+  <input
+    type="date"
+    className="border rounded px-3 py-2"
+    onChange={e => setForecastFilters({ ...forecastFilters, endDate: e.target.value })}
+  />
+
+  <select
+    className="border rounded px-3 py-2"
+    onChange={e => setForecastFilters({ ...forecastFilters, batchId: e.target.value })}
+  >
+    <option value="">All Batches</option>
+    {Array.from(new Set(forecastData.map((f: any) => f.batchId))).map(id => (
+      <option key={id} value={id}>
+        Batch {id}
+      </option>
+    ))}
+  </select>
+
+  <select
+    className="border rounded px-3 py-2"
+    onChange={e => setForecastFilters({ ...forecastFilters, breed: e.target.value })}
+  >
+    <option value="">All Breeds</option>
+    {Array.from(new Set(forecastData.map((f: any) => f.breed))).map(breed => (
+      <option key={breed} value={breed}>
+        {breed}
+      </option>
+    ))}
+  </select>
+
+</div>
+
+
  {/* Monthly Forecast Chart */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 md:p-6 overflow-x-auto">
         <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Monthly Forecast: Mortality & Harvest</h3>
@@ -364,7 +415,13 @@ const toggleNotifications = () => setShowNotifications(prev => !prev);
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: '#4b5563', fontWeight: 500 }} />
             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: '#4b5563', fontWeight: 500 }} />
-            <Tooltip />
+      <Tooltip
+  formatter={(value, name, props: any) => [
+    value,
+    `${name} | ${props.payload.batch} (${props.payload.breed})`
+  ]}
+/>
+
             <Legend verticalAlign="top" align="center" iconType="circle" wrapperStyle={{ paddingBottom: 10 }} />
             <Line type="monotone" dataKey="actualMortality" stroke="#dc2626" strokeWidth={1.5} dot={{ r: 3, fill: '#dc2626' }} />
             <Line type="monotone" dataKey="predictedMortality" stroke="#2563eb" strokeWidth={1.5} strokeDasharray="5 5" dot={{ r: 3, fill: '#2563eb' }} />

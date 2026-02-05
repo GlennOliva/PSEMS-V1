@@ -46,6 +46,13 @@ export interface DailyLog {
   mortality_id: number;
   feed: number;
   user_id: number;
+    // optional if API already returns it
+  batch_name?: string;
+
+  // frontend-enriched fields
+  mortality_cause?: string;
+  mortality_quantity?: number;
+  mortality_notes?: string;
 }
 
 

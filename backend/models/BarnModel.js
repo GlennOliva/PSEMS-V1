@@ -90,3 +90,73 @@ exports.delete = (id, callback) => {
   const sql = 'DELETE FROM tbl_barn WHERE id = ?';
   db.query(sql, [id], callback);
 };
+
+
+
+// ✅ Get barn_id using batchId
+exports.getBarnIdByBatchId = (batchId, callback) => {
+  const sql = `
+    SELECT barn_id
+    FROM tbl_batch
+    WHERE id = ?
+    LIMIT 1
+  `;
+
+  db.query(sql, [batchId], (err, rows) => {
+    if (err) return callback(err);
+
+    if (!rows || rows.length === 0) {
+      return callback(null, null);
+    }
+
+    return callback(null, rows[0].barn_id);
+  });
+};
+
+// ✅ Get barn info by barnId
+exports.getById = (barnId, callback) => {
+  const sql = `
+    SELECT id, barn_name, status
+    FROM tbl_barn
+    WHERE id = ?
+    LIMIT 1
+  `;
+  db.query(sql, [barnId], callback);
+};
+
+// ✅ Count all batches + harvested batches inside the barn
+exports.getBatchCountsByBarnId = (barnId, callback) => {
+  // ✅ "harvested" rule used here:
+  // A batch is considered harvested if:
+  // - date_completed IS NOT NULL
+  // OR
+  // - status is one of: harvested/completed/done/finished  (case-insensitive)
+  //
+  // If your system uses a different status word, add it below.
+  const sql = `
+    SELECT
+      COUNT(*) AS total_batches,
+      SUM(
+        CASE
+          WHEN date_completed IS NOT NULL
+            OR (status IS NOT NULL AND LOWER(status) IN ('harvested', 'completed', 'done', 'finished'))
+          THEN 1
+          ELSE 0
+        END
+      ) AS harvested_batches
+    FROM tbl_batch
+    WHERE barn_id = ?
+  `;
+
+  db.query(sql, [barnId], callback);
+};
+
+// ✅ Update barn status (Available / Occupied)
+exports.updateStatus = (barnId, status, callback) => {
+  const sql = `
+    UPDATE tbl_barn
+    SET status = ?
+    WHERE id = ?
+  `;
+  db.query(sql, [status, barnId], callback);
+};

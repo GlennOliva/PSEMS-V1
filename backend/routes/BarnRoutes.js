@@ -20,4 +20,6 @@ router.put('/:id', controller.updateBarn);
 // 🟢 Delete barn by ID
 router.delete('/:id', controller.deleteBarn);
 
+router.get('/availability/by-batch/:batchId', controller.getAvailabilityByBatchId);
+
 module.exports = router;

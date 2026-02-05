@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Modal from "./Modal";
 import { Batch } from "../types";
 import Snackbar from "@mui/material/Snackbar";
@@ -13,6 +13,8 @@ interface BatchModalProps {
 }
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
+
+const normalize = (s: string) => (s ?? "").trim().toLowerCase();
 
 const BatchModal: React.FC<BatchModalProps> = ({
   isOpen,
@@ -33,6 +35,10 @@ const BatchModal: React.FC<BatchModalProps> = ({
   });
 
   const [barns, setBarns] = useState<{ id: number; barn_name: string }[]>([]);
+  const [existingBatches, setExistingBatches] = useState<
+    { id: number; batch_name: string; barn_id: number }[]
+  >([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,80 +52,107 @@ const BatchModal: React.FC<BatchModalProps> = ({
     severity: "success",
   });
 
-  // Fetch barns when modal opens
+  // ✅ duplicate check (safe)
+  const isDuplicateBatchName = useMemo(() => {
+    const name = normalize(formData.batch_name);
+    if (!name) return false;
+
+    const currentId = formData.id ? Number(formData.id) : null;
+
+    return existingBatches.some((b) => {
+      // If you want uniqueness per barn, uncomment:
+      // if (String(b.barn_id) !== String(formData.barn_id)) return false;
+
+      if (currentId && b.id === currentId) return false; // allow same name for same record in edit
+      return normalize(b.batch_name) === name;
+    });
+  }, [formData.batch_name, formData.barn_id, formData.id, existingBatches]);
+
+  // ✅ Fetch barns + batches when modal opens
   useEffect(() => {
+    if (!isOpen) return;
+
     const fetchBarns = async () => {
       try {
         const res = await fetch(`${apiUrl}/api/barn`);
         const data = await res.json();
-
-        if (!Array.isArray(data)) {
-          console.error("Invalid barn data", data);
-          throw new Error("Invalid barn data format");
-        }
-
+        if (!Array.isArray(data)) throw new Error("Invalid barn data format");
         setBarns(data);
       } catch (err) {
         console.error("Failed to fetch barns:", err);
         setError("Could not load barn list");
       }
     };
-    if (isOpen) fetchBarns();
+
+    const fetchBatches = async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/batch`);
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+
+        setExistingBatches(
+          data.map((x: any) => ({
+            id: Number(x.id),
+            batch_name: String(x.batch_name ?? ""),
+            barn_id: Number(x.barn_id),
+          }))
+        );
+      } catch (err) {
+        console.error("Failed to fetch batches for duplicate check:", err);
+      }
+    };
+
+    fetchBarns();
+    fetchBatches();
   }, [isOpen]);
 
-useEffect(() => {
-  if (batch && mode === "edit") {
-    setFormData({
-      id: batch.id.toString(),
-      barn_id: batch.barn_id.toString(),
-      batch_name: batch.batch_name,
-      breed: batch.breed,
-      no_chicken: batch.no_chicken?.toString() ?? "",
-      date_started: batch.date_started,
-      date_completed: batch.date_completed || "",
-      status: batch.date_completed ? "Completed" : "Active", // auto-set based on date_completed
-    });
-  } else {
-    setFormData({
-      id: "",
-      barn_id: "",
-      batch_name: "",
-      breed: "",
-      no_chicken: "",
-      date_started: "",
-      date_completed: "",
-      status: "Active", // default for new batch
-    });
-  }
-}, [batch, mode, isOpen]);
-
-
-
-
-
-
-const handleChange = (
-  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-) => {
-  const { name, value } = e.target;
-
-  setFormData((prev) => {
-    let updated = { ...prev, [name]: value };
-
-    // ✅ Auto-status logic: Active if no date_completed, Completed if date_completed is set
-    if (name === "date_completed") {
-      updated.status = value ? "Completed" : "Active";
+  // Populate form when editing
+  useEffect(() => {
+    if (batch && mode === "edit") {
+      setFormData({
+        id: batch.id.toString(),
+        barn_id: batch.barn_id.toString(),
+        batch_name: batch.batch_name,
+        breed: batch.breed,
+        no_chicken: batch.no_chicken?.toString() ?? "",
+        date_started: batch.date_started,
+        date_completed: batch.date_completed || "",
+        status: batch.date_completed ? "Completed" : "Active",
+      });
+    } else {
+      setFormData({
+        id: "",
+        barn_id: "",
+        batch_name: "",
+        breed: "",
+        no_chicken: "",
+        date_started: "",
+        date_completed: "",
+        status: "Active",
+      });
     }
+    setError(null);
+  }, [batch, mode, isOpen]);
 
-    return updated;
-  });
-};
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
 
+    setFormData((prev) => {
+      const updated: any = { ...prev, [name]: value };
 
+      // auto status based on date_completed
+      if (name === "date_completed") {
+        updated.status = value ? "Completed" : "Active";
+      }
 
+      return updated;
+    });
 
-
-
+    // clear generic error when user edits
+    setError(null);
+  };
 
   const handleSnackbarClose = (
     _event?: React.SyntheticEvent | Event,
@@ -134,101 +167,106 @@ const handleChange = (
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError(null);
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-  const currentUserId = localStorage.getItem("user_id");
-  if (!currentUserId) {
-    setError("User not logged in");
-    setLoading(false);
-    return;
-  }
-
-  const noChickens = Number(formData.no_chicken);
-  const barnIdNum = Number(formData.barn_id);
-  const idNum = formData.id ? Number(formData.id) : undefined;
-
-  if (
-    !barnIdNum ||
-    !formData.batch_name ||
-    !formData.breed ||
-    !formData.date_started ||
-    !formData.status ||
-    isNaN(noChickens) ||
-    noChickens <= 0
-  ) {
-    setError("Please fill all required fields with valid values");
-    setLoading(false);
-    return;
-  }
-
-  // ✅ force everything into primitives
-  const body = {
-    user_id: String(currentUserId),
-    id: idNum,
-    barn_id: barnIdNum,
-    batch_name: String(formData.batch_name),
-    breed: String(formData.breed),
-    no_chicken: noChickens,
-    date_started: String(formData.date_started),
-    date_completed: formData.date_completed
-      ? String(formData.date_completed)
-      : null,
-    status: String(formData.status),
-  };
-
-  try {
-    const url =
-      mode === "add"
-        ? `${apiUrl}/api/batch/add`
-        : `${apiUrl}/api/batch/${idNum}`;
-    const method = mode === "add" ? "POST" : "PUT";
-
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body), // ✅ now safe
-    });
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || "Something went wrong");
+    // ✅ block duplicate ONLY here
+    if (isDuplicateBatchName) {
+      setLoading(false);
+      setError("Batch name already exists. Please use a unique name.");
+      showSnackbar(
+        "Batch name already exists. Please use a unique name.",
+        "error"
+      );
+      return;
     }
 
-    // ✅ server response should be plain JSON now
-    const savedBatch = await res.json();
+    const currentUserId = localStorage.getItem("user_id");
+    if (!currentUserId) {
+      setError("User not logged in");
+      setLoading(false);
+      return;
+    }
 
-    onSave?.({
-      id: savedBatch.id ?? idNum,
+    const noChickens = Number(formData.no_chicken);
+    const barnIdNum = Number(formData.barn_id);
+    const idNum = formData.id ? Number(formData.id) : undefined;
+
+    if (
+      !barnIdNum ||
+      !formData.batch_name ||
+      !formData.breed ||
+      !formData.date_started ||
+      !formData.status ||
+      isNaN(noChickens) ||
+      noChickens <= 0
+    ) {
+      setError("Please fill all required fields with valid values");
+      setLoading(false);
+      return;
+    }
+
+    const body = {
+      user_id: String(currentUserId),
+      id: idNum,
       barn_id: barnIdNum,
-      batch_name: formData.batch_name,
-      breed: formData.breed,
+      batch_name: String(formData.batch_name),
+      breed: String(formData.breed),
       no_chicken: noChickens,
-      date_started: formData.date_started,
-      date_completed: formData.date_completed || undefined,
-      status: formData.status,
-    });
+      date_started: String(formData.date_started),
+      date_completed: formData.date_completed ? String(formData.date_completed) : null,
+      status: String(formData.status),
+    };
 
-    showSnackbar(
-      mode === "add"
-        ? "Batch added successfully!"
-        : "Batch updated successfully!",
-      "success"
-    );
+    try {
+      const url =
+        mode === "add"
+          ? `${apiUrl}/api/batch/add`
+          : `${apiUrl}/api/batch/${idNum}`;
+      const method = mode === "add" ? "POST" : "PUT";
 
-    // 🔄 Refresh after success
-    setTimeout(() => window.location.reload(), 1000);
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    onClose();
-  } catch (err: any) {
-    console.error("Submit error:", err);
-    setError(err.message || "Something went wrong");
-    showSnackbar(err.message || "Something went wrong", "error");
-  } finally {
-    setLoading(false);
-  }
-};
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Something went wrong");
+      }
+
+      const savedBatch = await res.json();
+
+      onSave?.({
+        id: savedBatch.id ?? idNum,
+        barn_id: barnIdNum,
+        batch_name: formData.batch_name,
+        breed: formData.breed,
+        no_chicken: noChickens,
+        date_started: formData.date_started,
+        date_completed: formData.date_completed || undefined,
+        status: formData.status,
+      });
+
+      showSnackbar(
+        mode === "add" ? "Batch added successfully!" : "Batch updated successfully!",
+        "success"
+      );
+
+      setTimeout(() => window.location.reload(), 1000);
+      onClose();
+    } catch (err: any) {
+      console.error("Submit error:", err);
+      setError(err.message || "Something went wrong");
+      showSnackbar(err.message || "Something went wrong", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const today = new Date().toISOString().split("T")[0];
 
   return (
     <>
@@ -239,15 +277,11 @@ const handleChange = (
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="text-red-600 text-sm font-medium">{error}</div>
-          )}
+          {error && <div className="text-red-600 text-sm font-medium">{error}</div>}
 
           {/* Barn Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Barn
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Barn</label>
             <select
               name="barn_id"
               value={formData.barn_id}
@@ -257,7 +291,7 @@ const handleChange = (
             >
               <option value="">Select Barn</option>
               {barns.map((b) => (
-                <option key={b.id} value={b.id}>
+                <option key={b.id} value={String(b.id)}>
                   {b.barn_name}
                 </option>
               ))}
@@ -276,15 +310,18 @@ const handleChange = (
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
-                disabled={formData.status === "Completed"} // disable if completed
+              disabled={formData.status === "Completed"}
             />
+            {isDuplicateBatchName && (
+              <p className="text-red-600 text-sm mt-1">
+                Batch name already exists. Please use a unique name.
+              </p>
+            )}
           </div>
 
           {/* Breed */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Breed
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Breed</label>
             <select
               name="breed"
               value={formData.breed}
@@ -294,8 +331,6 @@ const handleChange = (
             >
               <option value="">Select Breed</option>
               <option value="Broiler">Broiler</option>
-              <option value="Layer">Layer</option>
-              <option value="Free Range">Free Range</option>
             </select>
           </div>
 
@@ -312,27 +347,27 @@ const handleChange = (
               min={1}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
-                disabled={formData.status === "Completed"} // disable if completed
+              disabled={formData.status === "Completed"}
             />
           </div>
 
-          {/* Dates */}
+          {/* Date Started */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Date Started
             </label>
             <input
-  type="date"
-  name="date_started"
-  value={formData.date_started}
-  onChange={handleChange}
-  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-  max={new Date().toISOString().split("T")[0]} // today as max
-  required
-
-/>
-
+              type="date"
+              name="date_started"
+              value={formData.date_started}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              max={today}
+              required
+            />
           </div>
+
+          {/* Date Completed */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Date Completed (Optional)
@@ -343,33 +378,9 @@ const handleChange = (
               value={formData.date_completed}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-
-           />
+              max={today}
+            />
           </div>
-
-          {/* Status
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Status
-            </label>
-          <select
-  name="status"
-  value={formData.status}
-  onChange={handleChange}
-  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-  required
-
->
-  <option value="" disabled>
-    Select Status
-  </option>
-  <option value="Active">Active</option>
-  <option value="Completed">Completed</option>
-  <option value="Terminated">Terminated</option>
-</select>
-
-
-          </div> */}
 
           {/* Buttons */}
           <div className="flex justify-end space-x-3 pt-4">
@@ -381,10 +392,11 @@ const handleChange = (
             >
               Cancel
             </button>
+
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors duration-200"
-              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors duration-200 disabled:opacity-50"
+              disabled={loading || isDuplicateBatchName}
             >
               {mode === "add" ? "Add Batch" : "Update Batch"}
             </button>

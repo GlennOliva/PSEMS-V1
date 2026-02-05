@@ -67,7 +67,7 @@ exports.addGrowth = (req, res) => {
   }
 };
 
-// ✏️ Update growth tracking record
+
 exports.updateGrowth = (req, res) => {
   const id = req.params.id;
   const { batch_id, date, age, total_weight, no_chicken, average_weight } = req.body;
