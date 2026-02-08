@@ -84,7 +84,7 @@ exports.markCompleted = (batchId, dateCompleted, callback) => {
     UPDATE tbl_batch
     SET date_completed = ?, status = 'Completed'
     WHERE id = ?
-      AND (date_completed IS NULL OR date_completed = '')
+      AND date_completed IS NULL
   `;
-  db.query(sql, [dateCompleted || null, batchId], callback);
+  db.query(sql, [dateCompleted, batchId], callback);
 };
