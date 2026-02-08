@@ -1,4 +1,7 @@
 const Batch = require('../models/BatchModel');
+const Harvest = require('../models/HarvestModel');
+const Mortality = require('../models/MortalityModel');
+
 
 // 📥 Get all Batches
 exports.getAllBatches = (req, res) => {
@@ -159,3 +162,47 @@ exports.deleteBatch = (req, res) => {
     res.json({ message: 'Batch deleted successfully!' });
   });
 };
+
+
+
+exports.getHarvestLimit = (req, res) => {
+  const batchId = req.params.id;
+  const today = (req.query.date || new Date().toISOString().split('T')[0]);
+  const excludeHarvestId = req.query.excludeHarvestId ? Number(req.query.excludeHarvestId) : null;
+
+  Batch.getById(batchId, (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Failed to fetch batch' });
+    if (!rows || rows.length === 0) return res.status(404).json({ error: 'Batch not found' });
+
+    const batch = rows[0];
+
+    const baseChickens = Number(batch.no_chicken) || 0;
+    const barnId = Number(batch.barn_id);
+    const startDate = batch.date_started;
+    const endDate = today;
+
+    Mortality.sumByBarnInRange(barnId, startDate, endDate, (err2, mortalityTotal) => {
+      if (err2) return res.status(500).json({ error: 'Failed to compute mortality total' });
+
+      Harvest.sumByBatchInRange(batchId, startDate, endDate, excludeHarvestId, (err3, harvestedTotal) => {
+        if (err3) return res.status(500).json({ error: 'Failed to compute harvested total' });
+
+        const available = Math.max(0, baseChickens - mortalityTotal - harvestedTotal);
+
+        return res.json({
+          batch_id: Number(batchId),
+          batch_name: batch.batch_name,
+          barn_id: barnId,
+          baseChickens,
+          mortalityTotal,
+          harvestedTotal,
+          available,
+          startDate,
+          endDate,
+        });
+      });
+    });
+  });
+};
+
+

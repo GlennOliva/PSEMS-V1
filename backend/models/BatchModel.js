@@ -79,3 +79,12 @@ exports.delete = (id, callback) => {
   `;
   db.query(sql, [id], callback);
 };
+exports.markCompleted = (batchId, dateCompleted, callback) => {
+  const sql = `
+    UPDATE tbl_batch
+    SET date_completed = ?, status = 'Completed'
+    WHERE id = ?
+      AND (date_completed IS NULL OR date_completed = '')
+  `;
+  db.query(sql, [dateCompleted || null, batchId], callback);
+};

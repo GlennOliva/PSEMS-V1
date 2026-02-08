@@ -1,4 +1,5 @@
 const Harvest = require('../models/HarvestModel');
+const Batch = require('../models/BatchModel'); // ✅ ADD THIS
 
 // 📥 Get all Harvest records
 exports.getHarvests = (req, res) => {
@@ -40,12 +41,13 @@ exports.getHarvestById = (req, res) => {
   });
 };
 
-// ➕ Add Harvest
+// ➕ Add Harvest  ✅ ALSO mark batch completed
 exports.addHarvest = (req, res) => {
   try {
     const { user_id, batch_id, date, no_harvest, no_boxes } = req.body;
 
-    if (!user_id || !batch_id || !date || !no_harvest || !no_boxes) {
+    // ✅ allow 0 values by checking null/undefined
+    if (user_id == null || batch_id == null || !date || no_harvest == null || no_boxes == null) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
@@ -56,9 +58,26 @@ exports.addHarvest = (req, res) => {
         console.error('Database Error:', err);
         return res.status(500).json({ error: err });
       }
-      res.status(201).json({
-        message: 'Harvest record successfully created',
-        id: result.insertId
+
+      // ✅ after harvest saved → auto complete the selected batch
+      Batch.markCompleted(batch_id, date, (err2, upd) => {
+        if (err2) {
+          console.error('Batch completion update failed:', err2);
+          // You can decide: still return success, or fail.
+          // I recommend failing so you notice the issue early:
+          return res.status(500).json({
+            error: 'Harvest saved but failed to mark batch completed',
+            details: err2,
+          });
+        }
+
+        return res.status(201).json({
+          message: 'Harvest record successfully created and batch marked Completed',
+          id: result.insertId,
+          batch_completed: true,
+          batch_id: Number(batch_id),
+          date_completed: date,
+        });
       });
     });
   } catch (error) {
@@ -67,16 +86,15 @@ exports.addHarvest = (req, res) => {
   }
 };
 
-// ✏️ Update Harvest
+// ✏️ Update Harvest  ✅ keep batch completed (recommended)
 exports.updateHarvest = (req, res) => {
   const id = req.params.id;
   const { batch_id, date, no_harvest, no_boxes } = req.body;
 
-  if (!batch_id || !date || !no_harvest || !no_boxes) {
+  if (batch_id == null || !date || no_harvest == null || no_boxes == null) {
     return res.status(400).json({ error: 'Required fields are missing' });
   }
 
-  // Ensure the record exists
   Harvest.getById(id, (err, harvest) => {
     if (err) {
       console.error('Error fetching harvest:', err);
@@ -99,7 +117,18 @@ exports.updateHarvest = (req, res) => {
         return res.status(404).json({ message: 'Harvest record not found' });
       }
 
-      res.json({ message: 'Harvest record updated successfully!' });
+      // ✅ Ensure batch remains completed with date
+      Batch.markCompleted(batch_id, date, (err2) => {
+        if (err2) {
+          console.error('Batch completion update failed:', err2);
+          return res.status(500).json({
+            error: 'Harvest updated but failed to mark batch completed',
+            details: err2,
+          });
+        }
+
+        return res.json({ message: 'Harvest record updated successfully and batch marked Completed!' });
+      });
     });
   });
 };

@@ -104,3 +104,26 @@ exports.delete = (id, callback) => {
   const sql = 'DELETE FROM tbl_harvest WHERE id = ?';
   db.query(sql, [id], callback);
 };
+
+
+// total harvested for a batch in date range (excludeHarvestId optional)
+exports.sumByBatchInRange = (batchId, startDate, endDate, excludeHarvestId, callback) => {
+  let sql = `
+    SELECT COALESCE(SUM(CAST(no_harvest AS SIGNED)), 0) AS total
+    FROM tbl_harvest
+    WHERE batch_id = ?
+      AND date >= ?
+      AND date <= ?
+  `;
+  const params = [batchId, startDate, endDate];
+
+  if (excludeHarvestId) {
+    sql += ` AND id <> ?`;
+    params.push(excludeHarvestId);
+  }
+
+  db.query(sql, params, (err, rows) => {
+    if (err) return callback(err);
+    callback(null, Number(rows?.[0]?.total ?? 0));
+  });
+};

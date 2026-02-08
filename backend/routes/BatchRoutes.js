@@ -5,11 +5,12 @@ const controller = require('../controllers/BatchController');
 // 📥 Get all batches
 router.get('/', controller.getAllBatches);
 
-// 📥 Get batch by ID
+// ✅ Get batches by user ID FIRST
+router.get('/user/:user_id', controller.getBatchesByUserId);
+
+// ✅ then single batch by id
 router.get('/:id', controller.getBatchById);
 
-// 📥 Get batches by user ID
-router.get('/user/:user_id', controller.getBatchesByUserId);
 
 // ➕ Add batch
 router.post('/add', controller.addBatch);
@@ -19,5 +20,8 @@ router.put('/:id', controller.updateBatch);
 
 // ❌ Delete batch
 router.delete('/:id', controller.deleteBatch);
+
+router.get('/:id/harvest-limit', controller.getHarvestLimit);
+
 
 module.exports = router;

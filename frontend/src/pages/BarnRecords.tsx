@@ -41,7 +41,7 @@ const BarnRecords: React.FC = () => {
     { key: 'barn_id', label: 'Barn', sortable: true },
     { key: 'breed', label: 'Breed', sortable: true },
     { key: 'no_chicken', label: 'No. of Chickens', sortable: true },
-    { key: 'date_started', label: 'Date Started', sortable: true },
+    { key: 'date_started', label: 'Date Deployed', sortable: true },
     { key: 'date_completed', label: 'Date Completed', sortable: true },
     { key: 'status', label: 'Status', sortable: true }
   ];

@@ -354,7 +354,7 @@ const BatchModal: React.FC<BatchModalProps> = ({
           {/* Date Started */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date Started
+              Date Deployed
             </label>
             <input
               type="date"

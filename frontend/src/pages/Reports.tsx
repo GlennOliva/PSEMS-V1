@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import logo from '../images/image-removebg-preview.png';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line
@@ -32,22 +32,30 @@ interface SensorReading {
   id: string;
 }
 
+type MortalityRow = {
+  id?: number;
+  barn: string;
+  barn_id?: number;
+    barnName?: string;    // ✅ add
+  mortality: number;
+  cause?: string;
+  date: string; // "YYYY-MM-DD"
+};
+
 const Reports: React.FC = () => {
   const [harvestData, setHarvestData] = useState<any[]>([]);
-  const [mortalityData, setMortalityData] = useState<any[]>([]);
+  const [mortalityData, setMortalityData] = useState<MortalityRow[]>([]);
   const [forecastData, setForecastData] = useState<Forecast[]>([]);
   const [batchReports, setBatchReports] = useState<any[]>([]);
   const [sensorData, setSensorData] = useState<SensorReading[]>([]);
-const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const allowedYears = [2025, 2026];
 
-  const yearToUse = allowedYears.includes(currentYear) ? currentYear : 2026;
-
-  return `${yearToUse}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-});
-
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const allowedYears = [2025, 2026];
+    const yearToUse = allowedYears.includes(currentYear) ? currentYear : 2026;
+    return `${yearToUse}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   const printableRef = useRef<HTMLDivElement>(null);
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -62,71 +70,102 @@ const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     })}`;
   };
 
-  // ---------- Harvest Data ----------
-  useEffect(() => {
-    if (!currentUserId) return;
+  // =========================
+  // ✅ FETCHERS (re-usable)
+  // =========================
 
-    fetch(`${apiUrl}/api/harvest_data/${currentUserId}`)
-      .then(res => res.json())
-      .then(data => {
-        const formatted = data.map((item: any) => ({
-          batch: item.batch_name,
-          barn: item.barn_name,
-          chickens: item.no_harvest,
-          boxes: item.no_boxes
-        }));
-        setHarvestData(formatted);
-      })
-      .catch(err => console.error('Error fetching harvest data:', err));
+  const fetchHarvest = useCallback(async () => {
+    if (!apiUrl || !currentUserId) return;
+
+    const res = await fetch(`${apiUrl}/api/harvest_data/${currentUserId}`);
+    const data = await res.json();
+    const arr = Array.isArray(data) ? data : [];
+
+    const formatted = arr.map((item: any) => ({
+      batch: String(item.batch_name ?? item.batch ?? "").trim(),
+      barn: String(item.barn_name ?? item.barn ?? item.barnName ?? "").trim(),
+      barn_id:
+        item.barn_id != null ? Number(item.barn_id)
+          : item.barnId != null ? Number(item.barnId)
+            : undefined,
+      chickens: Number(item.no_harvest ?? item.chickens ?? 0),
+      boxes: Number(item.no_boxes ?? item.boxes ?? 0),
+      date: String(item.date ?? item.harvest_date ?? "").slice(0, 10),
+    }));
+
+    setHarvestData(formatted);
   }, [apiUrl, currentUserId]);
 
-  // ---------- Mortality Data ----------
-  useEffect(() => {
-    if (!currentUserId) return;
+  const fetchMortality = useCallback(async () => {
+    if (!apiUrl || !currentUserId) return;
 
-    fetch(`${apiUrl}/api/mortality_data/${currentUserId}`)
-      .then(res => res.json())
-      .then(data => {
-        const formatted = data.map((item: any) => ({
-          barn: item.barn_name,
-          mortality: item.quantity,
-          cause: item.cause
-        }));
-        setMortalityData(formatted);
-      })
-      .catch(err => console.error('Error fetching mortality data:', err));
+    const res = await fetch(`${apiUrl}/api/mortality_data/${currentUserId}`);
+    const data = await res.json();
+    const arr = Array.isArray(data) ? data : [];
+
+    // ✅ IMPORTANT: include id so each record becomes unique in the chart
+    const formatted: MortalityRow[] = arr.map((item: any) => ({
+      id: item.id ?? item.mortality_id ?? item.mortalityId,
+      barn: String(item.barn_name ?? item.barn ?? item.barnName ?? "").trim(),
+      barn_id:
+        item.barn_id != null ? Number(item.barn_id)
+          : item.barnId != null ? Number(item.barnId)
+            : undefined,
+      mortality: Number(item.quantity ?? item.mortality ?? 0),
+      cause: String(item.cause ?? ""),
+      date: String(item.date ?? "").slice(0, 10),
+    }));
+
+    // Debug (optional but helpful)
+    // console.log("RAW mortality:", data);
+    // console.log("FORMATTED mortality:", formatted);
+
+    setMortalityData(formatted);
   }, [apiUrl, currentUserId]);
 
-  // ---------- Forecast Data ----------
-  useEffect(() => {
-    fetch(`${apiUrl}/api/monthly_forecast/`)
-      .then(res => res.json())
-      .then((data: Forecast[]) => setForecastData(data))
-      .catch(err => console.error('Error fetching forecast:', err));
+  const fetchForecast = useCallback(async () => {
+    if (!apiUrl) return;
+
+    const res = await fetch(`${apiUrl}/api/monthly_forecast/`);
+    const data = await res.json();
+    setForecastData(Array.isArray(data) ? data : []);
   }, [apiUrl]);
 
-  // ---------- Batch Reports ----------
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const res = await axios.get(`${apiUrl}/api/reports/batch-report`);
-        setBatchReports(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchReports();
-  }, [apiUrl]);
+  const fetchBatchReports = useCallback(async () => {
+    if (!apiUrl || !currentUserId) return;
 
+    const res = await axios.get(`${apiUrl}/api/reports/batch-report?user_id=${currentUserId}`);
+    setBatchReports(Array.isArray(res.data) ? res.data : []);
+  }, [apiUrl, currentUserId]);
+
+  // ✅ on load
+  useEffect(() => {
+    fetchHarvest().catch(console.error);
+    fetchMortality().catch(console.error);
+    fetchForecast().catch(console.error);
+    fetchBatchReports().catch(console.error);
+  }, [fetchHarvest, fetchMortality, fetchForecast, fetchBatchReports]);
+
+  // ✅ manual refresh button
+  const refreshAll = useCallback(async () => {
+    await Promise.allSettled([
+      fetchHarvest(),
+      fetchMortality(),
+      fetchForecast(),
+      fetchBatchReports(),
+    ]);
+  }, [fetchHarvest, fetchMortality, fetchForecast, fetchBatchReports]);
+
+  // ---------- Batch Reports formatting ----------
   const formatBatchReportData = (data: any[]) => {
-    return data.map((d) => ({
+    return (Array.isArray(data) ? data : []).map((d) => ({
       ...d,
       date_started: d.date_started ? new Date(d.date_started).toISOString().split('T')[0] : '',
       date_completed: d.date_completed ? new Date(d.date_completed).toISOString().split('T')[0] : '',
-      avg_temperature: d.avg_temperature ?? 0,
-      avg_humidity: d.avg_humidity ?? 0,
-      avg_ammonia: d.avg_ammonia ?? 0,
-      avg_co2: d.avg_co2 ?? 0,
+      avg_temperature: d.avg_temperature == null ? "—" : Number(d.avg_temperature),
+      avg_humidity: d.avg_humidity == null ? "—" : Number(d.avg_humidity),
+      avg_ammonia: d.avg_ammonia == null ? "—" : Number(d.avg_ammonia),
+      avg_co2: d.avg_co2 == null ? "—" : Number(d.avg_co2),
     }));
   };
 
@@ -208,86 +247,132 @@ const [selectedMonth, setSelectedMonth] = useState<string>(() => {
       .filter(d => d.type === type)
       .map(d => ({ time: d.time, value: d.value }));
 
+  // ---------- ✅ Mortality Chart Data (FIXED) ----------
+  // This makes sure you can see separate bars like 15 and 20
+  // ✅ Barn name lookup (barn_id -> barn_name) from harvestData
+const barnNameById = useMemo(() => {
+  const map = new Map<number, string>();
+
+  (Array.isArray(harvestData) ? harvestData : []).forEach((h: any) => {
+    const id = Number(h?.barn_id);
+    const name = String(h?.barn ?? h?.barn_name ?? "").trim(); // your harvest formatter uses "barn"
+    if (Number.isFinite(id) && id > 0 && name) map.set(id, name);
+  });
+
+  return map;
+}, [harvestData]);
+
+ // ---------- ✅ Mortality Chart Data (barn_id → barn_name label) ----------
+const mortalityChartData = useMemo(() => {
+  const inMonth = (r: MortalityRow) => !r.date || r.date.startsWith(selectedMonth);
+
+  const grouped = new Map<number, { label: string; mortality: number }>();
+
+  (Array.isArray(mortalityData) ? mortalityData : [])
+    .filter(inMonth)
+    .forEach((r) => {
+      const barnId = r.barn_id != null ? Number(r.barn_id) : 0;
+
+      const barnName =
+        (barnId && barnNameById.get(barnId)) ||
+        String(r.barn ?? "").trim() ||
+        (barnId ? `Barn #${barnId}` : "Unknown Barn");
+
+      const prev = grouped.get(barnId) || { label: barnName, mortality: 0 };
+      prev.mortality += Number(r.mortality || 0);
+      grouped.set(barnId, prev);
+    });
+
+  return Array.from(grouped.values());
+}, [mortalityData, selectedMonth, barnNameById]);
+
+
   // ---------- Latest forecast ----------
   const latest: Forecast | null = useMemo(() => {
     return forecastData.length > 0 ? forecastData[forecastData.length - 1] : null;
   }, [forecastData]);
 
   // ---------- Summary Report Table ----------
-  // ---------- Summary Report Table ----------
-const batchSummaryReport = useMemo(() => {
-  const harvestMap: Record<string, any> = {};
-  const mortalityMap: Record<string, number> = {};
+  const batchSummaryReport = useMemo(() => {
+    const harvestMap: Record<string, any> = {};
+    const mortalityByBatch: Record<string, number> = {};
 
-  // helper normalize (fix mortality 0 issue)
-  const normalizeKey = (val: string) =>
-    (val || "").toString().trim().toLowerCase();
+    const normalizeKey = (val: any) => String(val ?? "").trim().toLowerCase();
 
-  // Harvest summary per batch
-  harvestData.forEach((h) => {
-    if (!harvestMap[h.batch]) {
-      harvestMap[h.batch] = {
-        batch: h.batch,
-        barn: h.barn,
-        harvestedChickens: 0,
-        harvestedBoxes: 0,
-      };
-    }
-
-    harvestMap[h.batch].harvestedChickens += Number(h.chickens || 0);
-    harvestMap[h.batch].harvestedBoxes += Number(h.boxes || 0);
-  });
-
-  // Mortality summary per barn
-  mortalityData.forEach((m) => {
-    const barnKey = normalizeKey(m.barn);
-    mortalityMap[barnKey] =
-      (mortalityMap[barnKey] || 0) + Number(m.mortality || 0);
-  });
-
-  // Environmental monthly averages
-  const avgByType = (type: string): number | null => {
-    const values = filteredSensorData
-      .filter((d) => d.type === type)
-      .map((d) => Number(d.value));
-
-    if (values.length === 0) return null;
-
-    return values.reduce((a, b) => a + b, 0) / values.length;
-  };
-
-  const avgTemperature = avgByType("temperature");
-  const avgHumidity = avgByType("humidity");
-  const avgAmmonia = avgByType("ammonia");
-  const avgCO2 = avgByType("co2");
-
-  // Merge
-  return Object.values(harvestMap).map((h: any) => {
-    const mortalityCount = mortalityMap[normalizeKey(h.barn)] || 0;
-
-    const totalBirds = h.harvestedChickens + mortalityCount;
-    const mortalityRate = totalBirds > 0 ? (mortalityCount / totalBirds) * 100 : 0;
-
-    return {
-      batch: h.batch,
-      barn: h.barn,
-      harvestedChickens: h.harvestedChickens,
-      harvestedBoxes: h.harvestedBoxes,
-      mortalityCount,
-      mortalityRate: mortalityRate.toFixed(2),
-
-      // show "—" if no sensor data for selected month
-      avgTemperature: avgTemperature !== null ? avgTemperature.toFixed(2) : "—",
-      avgHumidity: avgHumidity !== null ? avgHumidity.toFixed(2) : "—",
-      avgAmmonia: avgAmmonia !== null ? avgAmmonia.toFixed(2) : "—",
-      avgCO2: avgCO2 !== null ? avgCO2.toFixed(2) : "—",
-
-      predictedHarvest: latest?.predictedHarvest ?? "—",
-      predictedMortality: latest?.predictedMortality ?? "—",
+    const inSelectedMonth = (row: any) => {
+      const d = String(row?.date ?? "");
+      return !d || d.startsWith(selectedMonth);
     };
-  });
-}, [harvestData, mortalityData, filteredSensorData, latest]);
 
+    const harvestRows = harvestData.filter(inSelectedMonth);
+
+    harvestRows.forEach((h) => {
+      const batchName = String(h.batch ?? "").trim();
+      if (!batchName) return;
+
+      if (!harvestMap[batchName]) {
+        harvestMap[batchName] = {
+          batch: batchName,
+          harvestedChickens: 0,
+          harvestedBoxes: 0,
+        };
+      }
+
+      harvestMap[batchName].harvestedChickens += Number(h.chickens || 0);
+      harvestMap[batchName].harvestedBoxes += Number(h.boxes || 0);
+    });
+
+    const reports = Array.isArray(batchReports) ? batchReports : [];
+
+    const reportRows = reports.filter((r: any) => {
+      const ds = String(r?.date_started ?? "").slice(0, 7);
+      return !ds || ds === selectedMonth;
+    });
+
+    reportRows.forEach((r: any) => {
+      const key = normalizeKey(r?.batch_name ?? r?.id);
+      if (!key) return;
+      mortalityByBatch[key] = (mortalityByBatch[key] || 0) + Number(r?.mortality || 0);
+    });
+
+    const avgByType = (type: string): number | null => {
+      const values = filteredSensorData
+        .filter((d) => d.type === type)
+        .map((d) => Number(d.value));
+
+      if (values.length === 0) return null;
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    };
+
+    const avgTemperature = avgByType("temperature");
+    const avgHumidity = avgByType("humidity");
+    const avgAmmonia = avgByType("ammonia");
+    const avgCO2 = avgByType("co2");
+
+    return Object.values(harvestMap).map((h: any) => {
+      const key = normalizeKey(h.batch);
+      const mortalityCount = mortalityByBatch[key] || 0;
+
+      const totalBirds = h.harvestedChickens + mortalityCount;
+      const mortalityRate = totalBirds > 0 ? (mortalityCount / totalBirds) * 100 : 0;
+
+      return {
+        batch: h.batch,
+        harvestedChickens: h.harvestedChickens,
+        harvestedBoxes: h.harvestedBoxes,
+        mortalityCount,
+        mortalityRate: mortalityRate.toFixed(2),
+
+        avgTemperature: avgTemperature !== null ? avgTemperature.toFixed(2) : "—",
+        avgHumidity: avgHumidity !== null ? avgHumidity.toFixed(2) : "—",
+        avgAmmonia: avgAmmonia !== null ? avgAmmonia.toFixed(2) : "—",
+        avgCO2: avgCO2 !== null ? avgCO2.toFixed(2) : "—",
+
+        predictedHarvest: latest?.predictedHarvest ?? "—",
+        predictedMortality: latest?.predictedMortality ?? "—",
+      };
+    });
+  }, [harvestData, batchReports, filteredSensorData, latest, selectedMonth]);
 
   // ---------- Print Report ----------
   const handlePrintReport = () => {
@@ -341,37 +426,45 @@ const batchSummaryReport = useMemo(() => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <button
-          onClick={handlePrintReport}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-        >
-          <Printer className="h-4 w-4 mr-2" /> Print Report
-        </button>
+
+        <div className="flex gap-2">
+          <button
+            onClick={refreshAll}
+            className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200"
+          >
+            Refresh Data
+          </button>
+
+          <button
+            onClick={handlePrintReport}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+          >
+            <Printer className="h-4 w-4 mr-2" /> Print Report
+          </button>
+        </div>
       </div>
 
       {/* Month Filter */}
-     {/* Month Filter */}
-<div className="mb-4">
-  <label className="mr-2 font-medium">Select Month:</label>
+      <div className="mb-4">
+        <label className="mr-2 font-medium">Select Month:</label>
 
-  <select
-    value={selectedMonth}
-    onChange={(e) => setSelectedMonth(e.target.value)}
-    className="px-3 py-2 border rounded-lg"
-  >
-    {[2025, 2026].map((year) =>
-      Array.from({ length: 12 }, (_, i) => {
-        const month = String(i + 1).padStart(2, "0");
-        return (
-          <option key={`${year}-${month}`} value={`${year}-${month}`}>
-            {formatMonthDisplay(`${year}-${month}`)}
-          </option>
-        );
-      })
-    )}
-  </select>
-</div>
-
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="px-3 py-2 border rounded-lg"
+        >
+          {[2025, 2026].map((year) =>
+            Array.from({ length: 12 }, (_, i) => {
+              const month = String(i + 1).padStart(2, "0");
+              return (
+                <option key={`${year}-${month}`} value={`${year}-${month}`}>
+                  {formatMonthDisplay(`${year}-${month}`)}
+                </option>
+              );
+            })
+          )}
+        </select>
+      </div>
 
       {/* Printable Section */}
       <div ref={printableRef}>
@@ -386,7 +479,6 @@ const batchSummaryReport = useMemo(() => {
               <thead>
                 <tr className="bg-blue-600 text-white">
                   <th className="border px-3 py-2">Batch No.</th>
-                  <th className="border px-3 py-2">Barn</th>
                   <th className="border px-3 py-2">Harvested Chickens</th>
                   <th className="border px-3 py-2">Harvested Boxes</th>
                   <th className="border px-3 py-2">Mortality Count</th>
@@ -405,7 +497,6 @@ const batchSummaryReport = useMemo(() => {
                   batchSummaryReport.map((row, idx) => (
                     <tr key={idx} className="text-center even:bg-gray-50">
                       <td className="border px-3 py-2 font-semibold">{row.batch}</td>
-                      <td className="border px-3 py-2">{row.barn}</td>
                       <td className="border px-3 py-2">{row.harvestedChickens}</td>
                       <td className="border px-3 py-2">{row.harvestedBoxes}</td>
                       <td className="border px-3 py-2 text-red-600 font-semibold">{row.mortalityCount}</td>
@@ -447,13 +538,19 @@ const batchSummaryReport = useMemo(() => {
             </ResponsiveContainer>
           </div>
 
-          {/* Mortality */}
+          {/* ✅ Mortality (FIXED) */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Mortality Data</h3>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={mortalityData}>
+              <BarChart data={mortalityChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="barn" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11 }}
+                  angle={-25}
+                  textAnchor="end"
+                  height={60}
+                />
                 <YAxis />
                 <Tooltip />
                 <Bar dataKey="mortality" fill="#EF4444" name="Mortality" />
@@ -462,7 +559,7 @@ const batchSummaryReport = useMemo(() => {
           </div>
         </div>
 
-        {/* Environment Charts */}
+          {/* Environment Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 section">
           {['temperature', 'humidity', 'ammonia', 'co2'].map(type => {
             let title = '', unit = '';
@@ -532,6 +629,6 @@ const batchSummaryReport = useMemo(() => {
       </div>
     </div>
   );
-};  
+};
 
 export default Reports;

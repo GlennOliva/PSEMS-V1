@@ -105,3 +105,18 @@ exports.delete = (id, callback) => {
   const sql = 'DELETE FROM tbl_mortality WHERE id = ?';
   db.query(sql, [id], callback);
 };
+
+
+exports.sumByBarnInRange = (barnId, startDate, endDate, callback) => {
+  const sql = `
+    SELECT COALESCE(SUM(quantity), 0) AS total
+    FROM tbl_mortality
+    WHERE barn_id = ?
+      AND date >= ?
+      AND date <= ?
+  `;
+  db.query(sql, [barnId, startDate, endDate], (err, rows) => {
+    if (err) return callback(err);
+    callback(null, Number(rows?.[0]?.total ?? 0));
+  });
+};

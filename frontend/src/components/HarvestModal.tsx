@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal';
 import { Harvest } from '../types';
 import Snackbar from '@mui/material/Snackbar';
@@ -14,9 +14,6 @@ interface HarvestModalProps {
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
-// ✅ Max harvest rule: must be BELOW 500
-const MAX_HARVEST = 499;
-
 // ✅ localStorage key for system notice (survives reload)
 const BARN_NOTICE_KEY = 'barn_occupancy_notice';
 
@@ -24,6 +21,18 @@ type BarnAvailabilityResponse = {
   barn_id: number;
   barn_name: string;
   available: boolean;
+};
+
+type HarvestLimitResponse = {
+  batch_id: number;
+  batch_name: string;
+  barn_id: number;
+  baseChickens: number;
+  mortalityTotal: number;
+  harvestedTotal: number;
+  available: number;
+  startDate: string;
+  endDate: string;
 };
 
 const HarvestModal: React.FC<HarvestModalProps> = ({
@@ -42,9 +51,9 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
     number_of_boxes: '',
   });
 
-  const [batches, setBatches] = useState<
-    { id: number; batch_id: string; batch_name: string }[]
-  >([]);
+  const [batches, setBatches] = useState<{ id: number; batch_name: string }[]>([]);
+  const [limit, setLimit] = useState<HarvestLimitResponse | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const userId = localStorage.getItem('user_id');
@@ -55,28 +64,44 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
     severity: 'success' | 'error';
   }>({ open: false, message: '', severity: 'success' });
 
+  const maxAllowed = useMemo(() => {
+    // if no batch selected, 0; if limit not loaded yet, 0
+    return Math.max(0, Number(limit?.available ?? 0));
+  }, [limit]);
+
+  // ✅ Fetch batches on open
   useEffect(() => {
     const fetchBatches = async () => {
       try {
         const res = await fetch(`${apiUrl}/api/batch`);
         if (!res.ok) throw new Error('Failed to fetch batches');
         const data = await res.json();
-        setBatches(data);
+        if (!Array.isArray(data)) throw new Error('Invalid batch response');
+        setBatches(
+          data.map((b: any) => ({
+            id: Number(b.id),
+            batch_name: String(b.batch_name ?? ''),
+          }))
+        );
       } catch (err) {
         console.error(err);
         setError('Could not load batch list');
       }
     };
+
     if (isOpen) fetchBatches();
   }, [isOpen]);
 
+  // ✅ Populate form when editing / reset when adding
   useEffect(() => {
+    if (!isOpen) return;
+
     if (harvest && mode === 'edit') {
       setFormData({
-        batch_id: harvest.batch_id,
-        date: today,
-        harvest: harvest.harvest.toString(),
-        number_of_boxes: harvest.number_of_boxes.toString(),
+        batch_id: String(harvest.batch_id),
+        date: today, // disabled anyway
+        harvest: String(harvest.harvest ?? ''),
+        number_of_boxes: String(harvest.number_of_boxes ?? ''),
       });
     } else {
       setFormData({
@@ -86,6 +111,8 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
         number_of_boxes: '',
       });
     }
+
+    setLimit(null);
     setError(null);
   }, [harvest, mode, isOpen, today]);
 
@@ -105,17 +132,14 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
   const checkBarnAvailabilityAndNotify = async (batchId: string) => {
     if (!batchId) return;
 
-    // You will implement this endpoint in backend:
-    // GET /api/barn/availability/by-batch/:batchId
     const res = await fetch(`${apiUrl}/api/barn/availability/by-batch/${batchId}`);
-    if (!res.ok) return; // don’t block save if this fails
+    if (!res.ok) return;
 
     const data = (await res.json()) as BarnAvailabilityResponse;
 
     if (data?.available) {
       const message = ` ${data.barn_name} is now available for occupancy.`;
 
-      // Save to localStorage so it still shows after your window.location.reload()
       localStorage.setItem(
         BARN_NOTICE_KEY,
         JSON.stringify({
@@ -127,7 +151,6 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
         })
       );
 
-      // Also dispatch an event (updates immediately if no reload yet)
       window.dispatchEvent(
         new CustomEvent('barn-availability', {
           detail: {
@@ -142,10 +165,62 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
     }
   };
 
+  // ✅ Fetch dynamic harvest limit when batch changes
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!formData.batch_id) {
+      setLimit(null);
+      return;
+    }
+
+    const fetchLimit = async () => {
+      try {
+        // If edit mode, exclude current harvest record so maxAllowed is correct
+        const exclude = harvest?.id ? `&excludeHarvestId=${harvest.id}` : '';
+        const res = await fetch(
+          `${apiUrl}/api/batch/${formData.batch_id}/harvest-limit?date=${today}${exclude}`
+        );
+
+        if (!res.ok) {
+          // fallback: no limit
+          setLimit(null);
+          return;
+        }
+
+        const data = (await res.json()) as HarvestLimitResponse;
+        setLimit(data);
+
+        // If user already typed something higher than max, clamp it
+        const typed = Number(formData.harvest || 0);
+        if (typed > Number(data.available || 0)) {
+          setFormData((prev) => ({ ...prev, harvest: String(data.available ?? 0) }));
+        }
+      } catch (e) {
+        console.error(e);
+        setLimit(null);
+      }
+    };
+
+    fetchLimit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, formData.batch_id, today]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+
+    // ✅ if user changes batch, reset harvest fields
+    if (name === 'batch_id') {
+      setFormData((prev) => ({
+        ...prev,
+        batch_id: value,
+        harvest: '',
+        number_of_boxes: prev.number_of_boxes,
+      }));
+      setError(null);
+      return;
+    }
 
     // ✅ guard: prevent setting a past date even if user types it
     if (name === 'date' && value < today) {
@@ -153,16 +228,19 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
       return;
     }
 
-    // ✅ guard: harvest must be BELOW 500
+    // ✅ guard: harvest cannot exceed dynamic maxAllowed
     if (name === 'harvest') {
       const n = Number(value);
+
       if (value !== '' && (!Number.isFinite(n) || n < 0)) {
         setError('Harvest must be a valid number (0 or higher).');
         return;
       }
-      if (value !== '' && n >= 500) {
-        setError('Harvest must be below 500.');
-        showSnackbar('Harvest must be below 500.', 'error');
+
+      if (value !== '' && n > maxAllowed) {
+        const msg = `Harvest cannot exceed ${maxAllowed}.`;
+        setError(msg);
+        showSnackbar(msg, 'error');
         return;
       }
     }
@@ -174,9 +252,9 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.date < today) {
-      setError('Date cannot be in the past.');
-      showSnackbar('Date cannot be in the past.', 'error');
+    if (!formData.batch_id) {
+      setError('Please select a batch.');
+      showSnackbar('Please select a batch.', 'error');
       return;
     }
 
@@ -186,9 +264,19 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
       showSnackbar('Harvest must be a valid number (0 or higher).', 'error');
       return;
     }
-    if (harvestNum >= 500) {
-      setError('Harvest must be below 500.');
-      showSnackbar('Harvest must be below 500.', 'error');
+
+    // ✅ enforce dynamic max at submit too
+    if (harvestNum > maxAllowed) {
+      const msg = `Harvest cannot exceed ${maxAllowed}.`;
+      setError(msg);
+      showSnackbar(msg, 'error');
+      return;
+    }
+
+    const boxesNum = parseInt(formData.number_of_boxes, 10);
+    if (!Number.isFinite(boxesNum) || boxesNum < 0) {
+      setError('Number of boxes must be 0 or higher.');
+      showSnackbar('Number of boxes must be 0 or higher.', 'error');
       return;
     }
 
@@ -201,7 +289,7 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
         batch_id: formData.batch_id,
         date: formData.date,
         no_harvest: harvestNum,
-        no_boxes: parseInt(formData.number_of_boxes, 10),
+        no_boxes: boxesNum,
       };
 
       let res: Response | null = null;
@@ -220,9 +308,12 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
         });
       }
 
-      // ✅ IMPORTANT: check API response, don’t assume success
       if (!res || !res.ok) {
-        const msg = 'Failed to save harvest. Please try again.';
+        const errData = res ? await res.json().catch(() => ({})) : {};
+        const msg =
+          errData?.error ||
+          errData?.message ||
+          'Failed to save harvest. Please try again.';
         setError(msg);
         showSnackbar(msg, 'error');
         return;
@@ -231,7 +322,7 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
       onSave?.({
         ...formData,
         harvest: harvestNum,
-        number_of_boxes: parseInt(formData.number_of_boxes, 10),
+        number_of_boxes: boxesNum,
       });
 
       showSnackbar(
@@ -241,7 +332,6 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
         'success'
       );
 
-      // ✅ NEW: check barn availability after successful save
       await checkBarnAvailabilityAndNotify(formData.batch_id);
 
       onClose();
@@ -284,12 +374,34 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
             >
               <option value="">Select Batch</option>
               {batches.map((b) => (
-                <option key={b.id} value={b.id}>
+                <option key={b.id} value={String(b.id)}>
                   {b.batch_name}
                 </option>
               ))}
             </select>
           </div>
+
+          {/* ✅ Breakdown box */}
+          {formData.batch_id && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+              {limit ? (
+                <>
+                  <div className="font-medium text-gray-800">
+                    Max harvest allowed: <span className="font-bold">{limit.available}</span>
+                  </div>
+                  <div className="text-gray-600 mt-1">
+                    {limit.baseChickens} (Batch) − {limit.mortalityTotal} (Mortality) − {limit.harvestedTotal} (Already Harvested)
+                    = <span className="font-semibold">{limit.available}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-gray-600">
+                  Loading harvest limit… (If this stays, add the backend endpoint
+                  <code className="ml-1">/api/batch/:id/harvest-limit</code>)
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -321,10 +433,11 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
               min="0"
-              max={MAX_HARVEST}
+              max={maxAllowed}
+              disabled={!formData.batch_id || !limit} // disable until limit is ready
             />
             <p className="text-xs text-gray-500 mt-1">
-              Must be below 500 (max {MAX_HARVEST}).
+              Max allowed: {formData.batch_id ? maxAllowed : 0}
             </p>
           </div>
 
@@ -358,7 +471,7 @@ const HarvestModal: React.FC<HarvestModalProps> = ({
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg
                          transition-colors duration-200 disabled:opacity-50"
-              disabled={loading}
+              disabled={loading || (!limit && !!formData.batch_id)}
             >
               {loading ? 'Saving...' : mode === 'add' ? 'Add Harvest' : 'Update Harvest'}
             </button>
